@@ -6,12 +6,23 @@
 //
 
 import SwiftUI
+import SwiftData
 
 @main
 struct FinancePlannerApp: App {
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootTabView()
         }
+        .modelContainer(for: [
+            ExpenseModel.self,
+            MonthModel.self
+        ])
     }
 }
+
+
+
+
+
