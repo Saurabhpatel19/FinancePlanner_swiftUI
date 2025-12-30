@@ -12,7 +12,10 @@ import SwiftData
 struct AllExpensesView: View {
 
     // MARK: - Data
-    @Query(sort: \ExpenseModel.id)
+    @Query(sort: [
+        SortDescriptor(\ExpenseModel.year, order: .forward),
+        SortDescriptor(\ExpenseModel.month, order: .forward)
+    ])
     private var expenses: [ExpenseModel]
 
     // MARK: - Body

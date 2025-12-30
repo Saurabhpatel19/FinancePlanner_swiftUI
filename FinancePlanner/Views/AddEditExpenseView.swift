@@ -8,177 +8,215 @@
 
 import SwiftUI
 import SwiftData
+import Foundation
 
-enum expenseActionType {
-    case add
-    case update
-    case delete
-}
 struct AddEditExpenseView: View {
 
+    // MARK: - Environment
     @Environment(\.dismiss) private var dismiss
-    // SwiftData
-    @Environment(\.modelContext) private var context
-    @Query(sort: \MonthModel.title) private var storedMonths: [MonthModel]
-    
-    var dataService: FinanceDataService {
-        FinanceDataService(context: context,
-                           monthsUI: monthsUI,
-                           storedMonths: storedMonths)
-    }
-    
+
+    // MARK: - Inputs
     let expense: ExpenseModel
-    let monthsUI: [MonthUI]
-    let selectedMonthIndex: Int
-    
-    // MARK: - Local State
+//    var actionType: ExpenseActionType
+    private let dataService: FinanceDataService
+
+    // MARK: - Editable State
     @State private var name: String
     @State private var amount: String
     @State private var type: ExpenseType
     @State private var frequency: ExpenseFrequency
-    @State private var currentActionType: expenseActionType
+    @State private var month: Int
+    @State private var year: Int
+    @State private var actionType: ExpenseActionType
 
-    @State private var showApplyConfirmDialog = false
+    // MARK: - UI State
+    @State private var showApplyScopeDialog = false
 
-    @State private var selectedStartMonthIndex: Int
-
+    // MARK: - Init
     init(
         expense: ExpenseModel,
-        monthsUI: [MonthUI],
-        selectedMonthIndex: Int,
-        actionType: expenseActionType
+        actionType: ExpenseActionType,
+        context: ModelContext
     ) {
         self.expense = expense
-        self.monthsUI = monthsUI
-        self.selectedMonthIndex = selectedMonthIndex
-        self.currentActionType = actionType
+        self.actionType = actionType
+        self.dataService = FinanceDataService(context: context)
 
         _name = State(initialValue: expense.name)
-        _amount = State(initialValue: expense.amount == 0 ? "" : String(Int(expense.amount)))
+        _amount = State(
+            initialValue: expense.amount == 0 ? "" : String(Int(expense.amount))
+        )
         _type = State(initialValue: expense.type)
         _frequency = State(initialValue: expense.frequency)
-        _currentActionType = State(initialValue: actionType)
-
-        _selectedStartMonthIndex = State(initialValue: selectedMonthIndex)
+        _month = State(initialValue: expense.month)
+        _year = State(initialValue: expense.year)
     }
 
+    // MARK: - Body
     var body: some View {
         NavigationStack {
             Form {
 
-                // MARK: - Expense
-                Section("Expense") {
+                // MARK: - Expense Details
+                Section("Expense Details") {
                     TextField("Name", text: $name)
+
                     TextField("Amount", text: $amount)
                         .keyboardType(.numberPad)
                 }
 
-                // MARK: - Type
-                Section("Type") {
-                    Picker("Type", selection: $type) {
-                        Text("Fixed").tag(ExpenseType.fixed)
-                        Text("Variable").tag(ExpenseType.variable)
-                    }
-                    .pickerStyle(.segmented)
-                }
-
-                // MARK: - Frequency
-                Section("Frequency") {
+                // MARK: - Schedule
+                Section("Schedule") {
                     Picker("Frequency", selection: $frequency) {
                         ForEach(ExpenseFrequency.allCases) { freq in
                             Text(freq.displayTitle)
                                 .tag(freq)
                         }
                     }
-                    .pickerStyle(.segmented)
-                    
-                    let title = frequency.affectsFutureMonths ? "Start Month" : "Month"
-                    Picker(title, selection: $selectedStartMonthIndex) {
-                        ForEach(selectedMonthIndex..<monthsUI.count, id: \.self) { index in
-                            Text(monthsUI[index].title)
-                                .tag(index)
+
+                    Picker("Month", selection: $month) {
+                        ForEach(1...12, id: \.self) { m in
+                            Text(monthName(m)).tag(m)
+                        }
+                    }
+
+                    Picker("Year", selection: $year) {
+                        ForEach(yearRange, id: \.self) { y in
+                            Text(String(y)).tag(y)
                         }
                     }
                 }
 
-                // MARK: - Delete Expense
-                if currentActionType == .update {
-                    Button("Delete") {
-                        // 🔥 EDIT CASE: ask confirmation if future months are involved
-                        currentActionType = .delete
-                        if frequency.affectsFutureMonths {
-                            showApplyConfirmDialog = true
-                        } else {
-                            dataService.expenseUnified(expense: expense, startMonthIndex: selectedStartMonthIndex, actionType: currentActionType)
-                            dismiss()
+                // MARK: - Type
+                Section("Type") {
+                    Picker("Expense Type", selection: $type) {
+                        ForEach(ExpenseType.allCases) { t in
+                            Text(t.displayTitle)
+                                .tag(t)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                // MARK: - Delete (Edit only)
+                if actionType == .update {
+                    Section {
+                        Button(role: .destructive) {
+                            deleteExpense()
+                        } label: {
+                            Text("Delete Expense")
                         }
                     }
                 }
             }
-            .navigationTitle("Add Expense")
+            .navigationTitle(actionType == .add ? "Add Expense" : "Edit Expense")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
 
-                // Cancel
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         dismiss()
                     }
                 }
 
-                // Save
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-
-                        expense.name = name
-                        expense.amount = Double(amount) ?? 0
-                        expense.type = type
-                        expense.frequency = frequency
-
-                        
-                        let applyToFuture = frequency.affectsFutureMonths
-                        
-                        // 🔥 EDIT CASE: ask confirmation if future months are involved
-                        if currentActionType == .update ,applyToFuture {
-                            showApplyConfirmDialog = true
-                        } else {
-                            dataService.expenseUnified(expense: expense, startMonthIndex: selectedStartMonthIndex, actionType: currentActionType)
-                            dismiss()
-                        }
+                        saveUpdateExpense()
                     }
-                    .disabled(name.isEmpty || amount.isEmpty)
+                    .disabled(!isValid)
                 }
             }
-            
-            .confirmationDialog(
-                "Apply changes to",
-                isPresented: $showApplyConfirmDialog,
-                titleVisibility: .visible
-            ) {
+        }
+        // MARK: - Apply Scope Dialog
+        .confirmationDialog(
+            "Apply changes to",
+            isPresented: $showApplyScopeDialog,
+            titleVisibility: .visible
+        ) {
 
-                Button("This month only") {
-                    // NOTE:
-                    // Frequency is temporarily mutated to oneTime
-                    // to scope edit to current month only.
-                    // Future refactor may replace this with explicit scope handling.
-                    if expense.frequency != .oneTime {
-                        expense.frequency = .oneTime
-                    }
-                    dataService.expenseUnified(expense: expense, startMonthIndex: selectedStartMonthIndex, actionType: currentActionType)
-                    dismiss()
-                }
-
-                Button("This & future months") {
-                    // When applying to future, respect the selected start month if the user chose it; otherwise use current month
-                    dataService.expenseUnified(expense: expense, startMonthIndex: selectedStartMonthIndex, actionType: currentActionType)
-                    dismiss()
-                }
-
-                Button("Cancel", role: .cancel) {
-                    currentActionType = .update
-                }
+            Button("This expense only") {
+                expense.frequency = .oneTime
+                dataService.expenseUnified(
+                    expense: expense,
+                    actionType: actionType
+                )
+                dismiss()
             }
 
+            Button("All recurring expenses") {
+                dataService.expenseUnified(
+                    expense: expense,
+                    actionType: actionType
+                )
+                dismiss()
+            }
+
+            Button("Cancel", role: .cancel) {
+                actionType = .update
+            }
+        } message: {
+            Text("This expense is recurring.")
         }
     }
 }
+
+private extension AddEditExpenseView {
+
+    // MARK: - Validation
+    var isValid: Bool {
+        !name.trimmingCharacters(in: .whitespaces).isEmpty &&
+        Double(amount) != nil
+    }
+
+    // MARK: - Save Routing
+    func saveUpdateExpense() {
+        let finalAmount = Double(amount) ?? 0
+
+        expense.name = name
+        expense.amount = finalAmount
+        expense.type = type
+        expense.frequency = frequency
+        expense.month = month
+        expense.year = year
+        
+        // 🔥 EDIT CASE: ask confirmation if future months are involved
+        if actionType == .update && expense.frequency != .oneTime {
+            showApplyScopeDialog = true
+        } else {
+            dataService.expenseUnified(
+                expense: expense,
+                actionType: actionType
+            )
+            dismiss()
+        }
+        
+    }
+    
+    // MARK: - Delete
+    func deleteExpense() {
+        self.actionType = .delete
+        // 🔥 EDIT CASE: ask confirmation if future months are involved
+        if expense.frequency == .oneTime {
+            dataService.expenseUnified(
+                expense: expense,
+                actionType: .delete
+            )
+            dismiss()
+        } else {
+            showApplyScopeDialog = true
+        }
+    }
+
+    // MARK: - Helpers
+    var yearRange: [Int] {
+        let currentYear = Calendar.current.component(.year, from: Date())
+        return Array((currentYear - 5)...(currentYear + 10))
+    }
+
+    func monthName(_ month: Int) -> String {
+        DateFormatter().monthSymbols[month - 1]
+    }
+}
+
+
 

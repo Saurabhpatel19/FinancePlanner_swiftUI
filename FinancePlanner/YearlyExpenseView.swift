@@ -28,7 +28,8 @@ struct YearlyExpenseView: View {
 
     // MARK: - Computed
     private var yearlyExpenses: [ExpenseModel] {
-        return expenses.filter { $0.frequency == .yearly && $0.year == selectedYear }
+        let yearlyExpenses = expenses.filter { $0.frequency == .yearly && $0.year == selectedYear }
+        return yearlyExpenses.sorted(using: SortDescriptor(\ExpenseModel.month, order: .forward))
     }
 
 

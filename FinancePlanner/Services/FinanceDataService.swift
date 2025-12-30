@@ -7,98 +7,189 @@
 
 
 import SwiftData
+import Foundation
+
+enum ExpenseActionType {
+    case add
+    case update
+    case delete
+}
 
 final class FinanceDataService {
 
     private let context: ModelContext
-    private let monthsUI: [MonthUI]
-    private let storedMonths: [MonthModel]
-    
-    init(
-        context: ModelContext,
-        monthsUI: [MonthUI],
-        storedMonths: [MonthModel]
-    ) {
+
+    init(context: ModelContext) {
         self.context = context
-        self.monthsUI = monthsUI
-        self.storedMonths = storedMonths
     }
 
-    // MARK: - Save (Add / Edit)
+    // MARK: - Unified Add / Update / Delete
     func expenseUnified(
         expense: ExpenseModel,
-        startMonthIndex: Int,
-        actionType: expenseActionType
-    )
-    {
-        let seriesId = expense.seriesId
+        actionType: ExpenseActionType
+    ) {
 
-        let endIndex: Int
-        if expense.frequency == .yearly {
-            endIndex = min(startMonthIndex + 12, monthsUI.count - 1)
-        } else if expense.frequency.affectsFutureMonths {
-            endIndex = monthsUI.count - 1
-        } else {
-            endIndex = startMonthIndex
-        }
+        switch actionType {
 
-        let indices: [Int]
-        if expense.frequency == .yearly {
-            indices = Array(Set([startMonthIndex, endIndex]))
-        } else {
-            indices = Array(startMonthIndex...endIndex)
-        }
+        // MARK: - ADD
+        case .add:
+            handleAdd(expense)
 
-        for index in indices {
-            let monthTitle = monthsUI[index].title
+        // MARK: - UPDATE
+        case .update:
+            handleUpdate(expense)
 
-            let month = storedMonths.first { $0.title == monthTitle }
-            ?? {
-                let newMonth = MonthModel(
-                    title: monthTitle,
-                    status: .draft,
-                    fixedExpenses: [],
-                    variableExpenses: []
-                )
-                context.insert(newMonth)
-                return newMonth
-            }()
-
-            switch actionType {
-            case .add:
-                let monthUI = monthsUI[index]
-
-                let copy = ExpenseModel(
-                    seriesId: seriesId,
-                    name: expense.name,
-                    amount: expense.amount,
-                    type: expense.type,
-                    frequency: expense.frequency,
-                    month: monthUI.month,
-                    year: monthUI.year
-                )
-                
-                if copy.type == .fixed {
-                    month.fixedExpenses.append(copy)
-                } else {
-                    month.variableExpenses.append(copy)
-                }
-
-            case .update:
-                let all = month.fixedExpenses + month.variableExpenses
-                for exp in all where exp.seriesId == seriesId {
-                    exp.name = expense.name
-                    exp.amount = expense.amount
-                    exp.type = expense.type
-                    exp.frequency = expense.frequency
-                }
-
-            case .delete:
-                month.fixedExpenses.removeAll { $0.seriesId == seriesId }
-                month.variableExpenses.removeAll { $0.seriesId == seriesId }
-            }
+        // MARK: - DELETE
+        case .delete:
+            handleDelete(expense)
         }
 
         try? context.save()
+    }
+}
+
+private extension FinanceDataService {
+
+    // MARK: - Add
+    func handleAdd(_ expense: ExpenseModel) {
+
+        let seriesId = expense.seriesId
+        let calendar = Calendar.current
+        let now = Date()
+        
+        let currentYear = calendar.component(.year, from: now)
+        let endYear = currentYear + 1
+
+        switch expense.frequency {
+            
+        case .oneTime:
+            // Single expense
+            let copy = makeCopy(
+                from: expense,
+                month: expense.month,
+                year: expense.year,
+                seriesId: seriesId
+            )
+            context.insert(copy)
+            
+            // Monthly expense
+        case .monthly:
+            var month = expense.month
+            var year = expense.year
+            
+            while year < endYear || (year == endYear && month <= 12) {
+                
+                let copy = makeCopy(
+                    from: expense,
+                    month: month,
+                    year: year,
+                    seriesId: seriesId
+                )
+                context.insert(copy)
+                
+                // increment month
+                month += 1
+                if month > 12 {
+                    month = 1
+                    year += 1
+                }
+            }
+            
+        case .yearly:
+            // Create for current year and next year
+            let current = makeCopy(
+                from: expense,
+                month: expense.month,
+                year: expense.year,
+                seriesId: seriesId
+            )
+            
+            let nextYear = makeCopy(
+                from: expense,
+                month: expense.month,
+                year: expense.year + 1,
+                seriesId: seriesId
+            )
+            
+            context.insert(current)
+            context.insert(nextYear)
+        }
+    }
+
+    // MARK: - Update
+    func handleUpdate(
+        _ expense: ExpenseModel
+    )
+    {
+        let descriptor = FetchDescriptor<ExpenseModel>()
+
+        guard let allExpenses = try? context.fetch(descriptor) else { return }
+        
+        for exp in allExpenses {
+
+            guard exp.seriesId == expense.seriesId else { continue }
+
+            if exp.frequency == expense.frequency {
+                // 🔑 Scope handling
+                if expense.frequency == .oneTime {
+                    if exp.month != expense.month || exp.year != expense.year {
+                        continue
+                    }
+                }
+                
+                // ✅ SAFE to update (series-level fields only)
+                exp.name = expense.name
+                exp.amount = expense.amount
+                exp.type = expense.type
+                exp.frequency = expense.frequency
+            }
+            // ❌ DO NOT TOUCH exp.month / exp.year
+        }
+    }
+
+
+
+    // MARK: - Delete
+    func handleDelete(_ expense: ExpenseModel) {
+
+        let descriptor = FetchDescriptor<ExpenseModel>()
+        guard let allExpenses = try? context.fetch(descriptor) else { return }
+
+        for exp in allExpenses {
+
+            guard exp.seriesId == expense.seriesId else { continue }
+
+            if exp.frequency == expense.frequency {
+
+                if expense.frequency == .oneTime {
+                    if exp.month != expense.month || exp.year != expense.year {
+                        continue
+                    }
+                }
+
+                context.delete(exp)
+            }
+        }
+    }
+    
+    // MARK: - Copy helper
+    func makeCopy(
+        from expense: ExpenseModel,
+        month: Int,
+        year: Int,
+        seriesId: UUID
+    ) -> ExpenseModel {
+
+        ExpenseModel(
+            seriesId: seriesId,
+            name: expense.name,
+            amount: expense.amount,
+            type: expense.type,
+            frequency: expense.frequency,
+            month: month,
+            year: year,
+            isPaid: false,
+            paidDate: nil
+        )
     }
 }

@@ -16,11 +16,11 @@ struct FinancePlannerApp: App {
             RootTabView()
         }
         .modelContainer(for: [
-            ExpenseModel.self,
-            MonthModel.self
+            ExpenseModel.self
         ])
     }
 }
+
 
 
 
