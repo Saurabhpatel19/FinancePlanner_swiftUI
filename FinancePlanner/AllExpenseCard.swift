@@ -30,8 +30,10 @@ struct AllExpenseCard: View {
                 }
 
                 infoRow(title: "Serial ID", value: shortSeriesId)
-                infoRow(title: "Month", value: monthText)
-                infoRow(title: "Year", value: yearText)
+                infoRow(title: "Month-Year", value: monthText + "-" + yearText)
+                infoRow(title: "Start Month-Year", value: startMonthText + "-" + startYearText)
+                infoRow(title: "End Month-Year", value: endMonthText + "-" + endYearText)
+
             }
 
             // MARK: - Section 2: Payment Info (Only if paid)
@@ -94,6 +96,38 @@ private extension AllExpenseCard {
         String(expense.year)
     }
 
+    var startMonthText: String {
+        if let startMonth = expense.startMonth {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "MM"
+            return formatter.monthSymbols[startMonth - 1]
+        }
+        return ""
+    }
+
+    var startYearText: String {
+        if let startYear = expense.startYear {
+            return String(startYear)
+        }
+        return ""
+    }
+    
+    var endMonthText: String {
+        if let startMonth = expense.endMonth {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "MM"
+            return formatter.monthSymbols[startMonth - 1]
+        }
+        return ""
+    }
+
+    var endYearText: String {
+        if let startYear = expense.endYear {
+            return String(startYear)
+        }
+        return ""
+    }
+    
     func formattedDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium

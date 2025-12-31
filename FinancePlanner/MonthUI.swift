@@ -45,10 +45,25 @@ struct MonthUI: Identifiable {
                 )
             }
         }
+        
+        for month in 1...12 {
+            if let date = calendar.date(
+                from: DateComponents(year: currentYear + 1, month: month)
+            ) {
+                months.append(
+                    MonthUI(
+                        month: month,
+                        year: currentYear + 1,
+                        title: fullFormatter.string(from: date),
+                        shortTitle: shortFormatter.string(from: date)
+                    )
+                )
+            }
+        }
 
         // If October or later → show next year
         if currentMonth >= 10 {
-            let nextYear = currentYear + 1
+            let nextYear = currentYear + 2
             for month in 1...12 {
                 if let date = calendar.date(
                     from: DateComponents(year: nextYear, month: month)

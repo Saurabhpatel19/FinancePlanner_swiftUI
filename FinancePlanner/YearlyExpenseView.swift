@@ -42,7 +42,7 @@ struct YearlyExpenseView: View {
 
         // Same rule as Home
         if currentMonth > 10 {
-            return [currentYear, currentYear + 1]
+            return [currentYear, currentYear + 1, currentYear + 2]
         } else {
             return [currentYear]
         }

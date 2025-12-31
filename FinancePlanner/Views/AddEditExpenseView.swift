@@ -17,7 +17,6 @@ struct AddEditExpenseView: View {
 
     // MARK: - Inputs
     let expense: ExpenseModel
-//    var actionType: ExpenseActionType
     private let dataService: FinanceDataService
 
     // MARK: - Editable State
@@ -25,10 +24,17 @@ struct AddEditExpenseView: View {
     @State private var amount: String
     @State private var type: ExpenseType
     @State private var frequency: ExpenseFrequency
-    @State private var month: Int
-    @State private var year: Int
     @State private var actionType: ExpenseActionType
 
+    @State private var month: Int          // oneTime only
+    @State private var year: Int
+
+    @State private var startMonth: Int
+    @State private var startYear: Int
+    
+    @State private var endMonth: Int
+    @State private var endYear: Int
+    
     // MARK: - UI State
     @State private var showApplyScopeDialog = false
 
@@ -48,8 +54,16 @@ struct AddEditExpenseView: View {
         )
         _type = State(initialValue: expense.type)
         _frequency = State(initialValue: expense.frequency)
+                
         _month = State(initialValue: expense.month)
-        _year = State(initialValue: expense.year)
+        _year  = State(initialValue: expense.year)
+
+        _startMonth = State(initialValue: expense.startMonth ?? expense.month)
+        _startYear  = State(initialValue: expense.startYear  ?? expense.year)
+
+        _endMonth = State(initialValue: expense.endMonth ?? expense.month)
+        _endYear  = State(initialValue: expense.endYear  ?? expense.year)
+
     }
 
     // MARK: - Body
@@ -69,23 +83,69 @@ struct AddEditExpenseView: View {
                 Section("Schedule") {
                     Picker("Frequency", selection: $frequency) {
                         ForEach(ExpenseFrequency.allCases) { freq in
-                            Text(freq.displayTitle)
-                                .tag(freq)
+                            Text(freq.displayTitle).tag(freq)
                         }
                     }
 
-                    Picker("Month", selection: $month) {
-                        ForEach(1...12, id: \.self) { m in
-                            Text(monthName(m)).tag(m)
+                    switch frequency {
+                    case .oneTime:
+                        Picker("Month", selection: $month) {
+                            ForEach(1...12, id: \.self) {
+                                Text(monthName($0)).tag($0)
+                            }
                         }
-                    }
 
-                    Picker("Year", selection: $year) {
-                        ForEach(yearRange, id: \.self) { y in
-                            Text(String(y)).tag(y)
+                        Picker("Year", selection: $year) {
+                            ForEach(yearRange, id: \.self) {
+                                Text(String($0)).tag($0)
+                            }
+                        }
+                    case .monthly:
+                        Picker("Start Month", selection: $startMonth) {
+                            ForEach(1...12, id: \.self) {
+                                Text(monthName($0)).tag($0)
+                            }
+                        }
+
+                        Picker("Start Year", selection: $startYear) {
+                            ForEach(yearRange, id: \.self) {
+                                Text(String($0)).tag($0)
+                            }
+                        }
+                        
+                        Picker("End Month", selection: $endMonth) {
+                            ForEach(1...12, id: \.self) {
+                                Text(monthName($0)).tag($0)
+                            }
+                        }
+
+                        Picker("End Year", selection: $endYear) {
+                            ForEach(yearRange, id: \.self) {
+                                Text(String($0)).tag($0)
+                            }
+                        }
+                    case .yearly:
+                        Picker("Month", selection: $month) {
+                            ForEach(1...12, id: \.self) {
+                                Text(monthName($0)).tag($0)
+                            }
+                        }
+
+                        Picker("Start Year", selection: $startYear) {
+                            ForEach(yearRange, id: \.self) {
+                                Text(String($0)).tag($0)
+                            }
+                        }
+                        
+                        Picker("End Year", selection: $endYear) {
+                            ForEach(yearRange, id: \.self) {
+                                Text(String($0)).tag($0)
+                            }
                         }
                     }
+                    
                 }
+
 
                 // MARK: - Type
                 Section("Type") {
@@ -136,6 +196,16 @@ struct AddEditExpenseView: View {
 
             Button("This expense only") {
                 expense.frequency = .oneTime
+                
+                expense.month = month
+                expense.year = year
+                
+                expense.startMonth = nil
+                expense.startYear = nil
+                
+                expense.endMonth = nil
+                expense.endYear = nil
+                
                 dataService.expenseUnified(
                     expense: expense,
                     actionType: actionType
@@ -179,6 +249,40 @@ private extension AddEditExpenseView {
         expense.month = month
         expense.year = year
         
+        switch frequency {
+        case .oneTime:
+            expense.month = month
+            expense.year = year
+            
+            expense.startMonth = nil
+            expense.startYear = nil
+            
+            expense.endMonth = nil
+            expense.endYear = nil
+        case .monthly:
+            
+            expense.startMonth = startMonth
+            expense.startYear = startYear
+            
+            expense.endMonth = endMonth
+            expense.endYear = endYear
+            
+            // 🔒 instance date locked for monthly
+            expense.month = startMonth
+            expense.year = startYear
+            
+        case .yearly:
+            expense.startMonth = nil
+            expense.startYear = startYear
+            
+            expense.endMonth = nil
+            expense.endYear = endYear
+            
+            // 🔒 instance date locked for monthly
+            expense.month = month
+            expense.year = startYear
+        }
+                
         // 🔥 EDIT CASE: ask confirmation if future months are involved
         if actionType == .update && expense.frequency != .oneTime {
             showApplyScopeDialog = true

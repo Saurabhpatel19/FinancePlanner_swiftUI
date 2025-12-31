@@ -67,6 +67,14 @@ enum ExpenseType: String, Codable, CaseIterable, Identifiable {
      var month: Int        // 1...12
      var year: Int         // 2025, 2026, etc
 
+     // 🔹 Recurrence boundary (monthly only)
+     var startMonth: Int?
+     var startYear: Int?
+     
+     // 🔹 Recurrence boundary (monthly only)
+     var endMonth: Int?
+     var endYear: Int?
+     
      // Payment state
      var isPaid: Bool
      
@@ -82,6 +90,10 @@ enum ExpenseType: String, Codable, CaseIterable, Identifiable {
          frequency: ExpenseFrequency,
          month: Int,
          year: Int,
+         startMonth: Int? = nil,
+         startYear: Int? = nil,
+         endMonth: Int? = nil,
+         endYear: Int? = nil,
          isPaid: Bool = false,
          paidDate: Date? = nil
      ) {
@@ -93,6 +105,10 @@ enum ExpenseType: String, Codable, CaseIterable, Identifiable {
          self.frequency = frequency
          self.month = month
          self.year = year
+         self.startMonth = startMonth
+         self.startYear = startYear
+         self.endMonth = endMonth
+         self.endYear = endYear
          self.isPaid = isPaid
          self.paidDate = paidDate
      }
