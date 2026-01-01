@@ -37,6 +37,9 @@ struct AddEditExpenseView: View {
     
     // MARK: - UI State
     @State private var showApplyScopeDialog = false
+    
+    //MARK: -Validation
+    @State private var validationMessage: String? = nil
 
     // MARK: - Init
     init(
@@ -69,106 +72,121 @@ struct AddEditExpenseView: View {
     // MARK: - Body
     var body: some View {
         NavigationStack {
-            Form {
+            VStack(spacing: 0) {
 
-                // MARK: - Expense Details
-                Section("Expense Details") {
-                    TextField("Name", text: $name)
-
-                    TextField("Amount", text: $amount)
-                        .keyboardType(.numberPad)
+                if let message = validationMessage {
+                    Text(message)
+                        .font(.subheadline)
+                        .foregroundColor(.white)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.red)
+                        .transition(.move(edge: .top))
                 }
+                Form {
 
-                // MARK: - Schedule
-                Section("Schedule") {
-                    Picker("Frequency", selection: $frequency) {
-                        ForEach(ExpenseFrequency.allCases) { freq in
-                            Text(freq.displayTitle).tag(freq)
-                        }
+                    // MARK: - Expense Details
+                    Section("Expense Details") {
+                        TextField("Name", text: $name)
+
+                        TextField("Amount", text: $amount)
+                            .keyboardType(.decimalPad)
                     }
 
-                    switch frequency {
-                    case .oneTime:
-                        Picker("Month", selection: $month) {
-                            ForEach(1...12, id: \.self) {
-                                Text(monthName($0)).tag($0)
+                    // MARK: - Schedule
+                    Section("Schedule") {
+                        Picker("Frequency", selection: $frequency) {
+                            ForEach(ExpenseFrequency.allCases) { freq in
+                                Text(freq.displayTitle).tag(freq)
                             }
                         }
 
-                        Picker("Year", selection: $year) {
-                            ForEach(yearRange, id: \.self) {
-                                Text(String($0)).tag($0)
+                        switch frequency {
+                        case .oneTime:
+                            Picker("Month", selection: $month) {
+                                ForEach(1...12, id: \.self) {
+                                    Text(monthName($0)).tag($0)
+                                }
                             }
-                        }
-                    case .monthly:
-                        Picker("Start Month", selection: $startMonth) {
-                            ForEach(1...12, id: \.self) {
-                                Text(monthName($0)).tag($0)
-                            }
-                        }
 
-                        Picker("Start Year", selection: $startYear) {
-                            ForEach(yearRange, id: \.self) {
-                                Text(String($0)).tag($0)
+                            Picker("Year", selection: $year) {
+                                ForEach(yearRange, id: \.self) {
+                                    Text(String($0)).tag($0)
+                                }
+                            }
+                        case .monthly:
+                            Picker("Start Month", selection: $startMonth) {
+                                ForEach(1...12, id: \.self) {
+                                    Text(monthName($0)).tag($0)
+                                }
+                            }
+
+                            Picker("Start Year", selection: $startYear) {
+                                ForEach(yearRange, id: \.self) {
+                                    Text(String($0)).tag($0)
+                                }
+                            }
+                            
+                            Picker("End Month", selection: $endMonth) {
+                                ForEach(1...12, id: \.self) {
+                                    Text(monthName($0)).tag($0)
+                                }
+                            }
+
+                            Picker("End Year", selection: $endYear) {
+                                ForEach(yearRange, id: \.self) {
+                                    Text(String($0)).tag($0)
+                                }
+                            }
+                        case .yearly:
+                            Picker("Month", selection: $month) {
+                                ForEach(1...12, id: \.self) {
+                                    Text(monthName($0)).tag($0)
+                                }
+                            }
+
+                            Picker("Start Year", selection: $startYear) {
+                                ForEach(yearRange, id: \.self) {
+                                    Text(String($0)).tag($0)
+                                }
+                            }
+                            
+                            Picker("End Year", selection: $endYear) {
+                                ForEach(yearRange, id: \.self) {
+                                    Text(String($0)).tag($0)
+                                }
                             }
                         }
                         
-                        Picker("End Month", selection: $endMonth) {
-                            ForEach(1...12, id: \.self) {
-                                Text(monthName($0)).tag($0)
-                            }
-                        }
-
-                        Picker("End Year", selection: $endYear) {
-                            ForEach(yearRange, id: \.self) {
-                                Text(String($0)).tag($0)
-                            }
-                        }
-                    case .yearly:
-                        Picker("Month", selection: $month) {
-                            ForEach(1...12, id: \.self) {
-                                Text(monthName($0)).tag($0)
-                            }
-                        }
-
-                        Picker("Start Year", selection: $startYear) {
-                            ForEach(yearRange, id: \.self) {
-                                Text(String($0)).tag($0)
-                            }
-                        }
-                        
-                        Picker("End Year", selection: $endYear) {
-                            ForEach(yearRange, id: \.self) {
-                                Text(String($0)).tag($0)
-                            }
-                        }
                     }
-                    
-                }
 
 
-                // MARK: - Type
-                Section("Type") {
-                    Picker("Expense Type", selection: $type) {
-                        ForEach(ExpenseType.allCases) { t in
-                            Text(t.displayTitle)
-                                .tag(t)
+                    // MARK: - Type
+                    Section("Type") {
+                        Picker("Expense Type", selection: $type) {
+                            ForEach(ExpenseType.allCases) { t in
+                                Text(t.displayTitle)
+                                    .tag(t)
+                            }
                         }
+                        .pickerStyle(.segmented)
                     }
-                    .pickerStyle(.segmented)
-                }
 
-                // MARK: - Delete (Edit only)
-                if actionType == .update {
-                    Section {
-                        Button(role: .destructive) {
-                            deleteExpense()
-                        } label: {
-                            Text("Delete Expense")
+                    // MARK: - Delete (Edit only)
+                    if actionType == .update {
+                        Section {
+                            Button(role: .destructive) {
+                                deleteExpense()
+                            } label: {
+                                Text("Delete Expense")
+                            }
                         }
                     }
                 }
             }
+            .animation(.easeInOut, value: validationMessage)
+
+            
             .navigationTitle(actionType == .add ? "Add Expense" : "Edit Expense")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -181,7 +199,9 @@ struct AddEditExpenseView: View {
 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        saveUpdateExpense()
+                        if validate() {
+                            saveUpdateExpense()
+                        }
                     }
                     .disabled(!isValid)
                 }
@@ -192,7 +212,8 @@ struct AddEditExpenseView: View {
             "Apply changes to",
             isPresented: $showApplyScopeDialog,
             titleVisibility: .visible
-        ) {
+        )
+        {
 
             Button("This expense only") {
                 expense.frequency = .oneTime
@@ -227,6 +248,10 @@ struct AddEditExpenseView: View {
         } message: {
             Text("This expense is recurring.")
         }
+        
+        .onChange(of: name) { _, _ in validationMessage = nil }
+        .onChange(of: amount) { _, _ in validationMessage = nil }
+        .onChange(of: frequency) { _, _ in validationMessage = nil }
     }
 }
 
@@ -238,6 +263,47 @@ private extension AddEditExpenseView {
         Double(amount) != nil
     }
 
+    private func validate() -> Bool {
+        validationMessage = nil
+
+        // Common
+        if name.trimmingCharacters(in: .whitespaces).isEmpty {
+            validationMessage = "Expense name is required."
+            return false
+        }
+
+        guard let value = Double(amount), value > 0 else {
+            validationMessage = "Enter a valid amount greater than 0."
+            return false
+        }
+
+        // Frequency-specific
+        switch frequency {
+
+        case .oneTime:
+            if month < 1 || month > 12 {
+                validationMessage = "Select a valid month."
+                return false
+            }
+
+        case .monthly:
+            if (startYear > endYear) ||
+               (startYear == endYear && startMonth > endMonth) {
+                validationMessage = "Start date must be before end date."
+                return false
+            }
+
+        case .yearly:
+            if startYear > endYear {
+                validationMessage = "Start year must be before end year."
+                return false
+            }
+        }
+
+        return true
+    }
+
+    
     // MARK: - Save Routing
     func saveUpdateExpense() {
         let finalAmount = Double(amount) ?? 0
