@@ -76,17 +76,16 @@ struct AllExpensesView: View {
                 }
             }
         } label: {
-            VStack(spacing: 0) {
-
+            PurpleGradientCard {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(String(section.year))
-                            .font(.title3.weight(.semibold))     // UIKit-like weight
-                            .foregroundColor(.primary)
+                            .font(.title3.weight(.semibold))
+                            .foregroundColor(.white)
 
                         Text("Total: ₹\(Int(total))")
                             .font(.caption)
-                            .foregroundColor(.primary)
+                            .foregroundColor(.white.opacity(0.9))
                     }
 
                     Spacer()
@@ -95,23 +94,13 @@ struct AllExpensesView: View {
                         .rotationEffect(
                             .degrees(expandedYears.contains(section.year) ? 0 : -90)
                         )
-                        .foregroundColor(.primary)            // subtle color
-                        .imageScale(.small)
+                        .foregroundColor(.white)
+                        .imageScale(.medium)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(Color(.blue).opacity(0.7))
-                )
-
-//                // Divider for UIKit separation
-//                Divider()
-//                    .background(Color(.systemGray4))
+                .padding(.trailing, 8)
             }
         }
         .buttonStyle(.plain)
-        
     }
 
 }

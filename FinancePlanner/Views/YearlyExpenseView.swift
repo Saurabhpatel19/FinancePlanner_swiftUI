@@ -33,6 +33,20 @@ struct YearlyExpenseView: View {
     @State private var showingPaymentSheet: ExpenseModel?
     @State private var showAddExpense = false
 
+    private var plannedTotal: Double {
+        yearlyExpenses.reduce(0) { $0 + $1.amount }
+    }
+
+    private var spentTotal: Double {
+        yearlyExpenses
+            .filter { $0.isPaid }
+            .reduce(0) { $0 + $1.amount }
+    }
+
+    private var unpaidCount: Int {
+        yearlyExpenses.filter { !$0.isPaid }.count
+    }
+    
     // MARK: - Computed
     private var yearlyExpenses: [ExpenseModel] {
         let yearlyExpenses = expenses.filter { $0.frequency == .yearly && $0.year == selectedYear }
@@ -69,6 +83,15 @@ struct YearlyExpenseView: View {
                 // Year chips
                 yearChips
 
+                if isCurrentYear {
+                    yearlyProgressSection
+                } else {
+                    PurpleGradientCard {
+                        Text("Total Planned Expense : \(Int(plannedTotal))")
+                            .foregroundColor(.white)
+                    }
+                }
+                
                 // Expense list
                 yearlyExpenseList
 
@@ -95,8 +118,8 @@ struct YearlyExpenseView: View {
                         name: "",
                         amount: 0,
                         type: .fixed,
-                        frequency: .monthly,
-                        month: 0,
+                        frequency: .yearly,
+                        month: 1,
                         year: selectedYear
                     ),
                     actionType: .add,
@@ -143,7 +166,7 @@ private extension YearlyExpenseView {
             .background(
                 Capsule()
                     .fill(selectedYear == year
-                          ? Color.accentColor
+                          ? Color.darkPurple
                           : Color(.systemGray5))
             )
             .foregroundColor(
@@ -184,5 +207,72 @@ private extension YearlyExpenseView {
             }
             .padding(.horizontal)
         }
+    }
+    
+    private var yearlyProgressSection: some View {
+        PurpleGradientCard {
+            
+            VStack(alignment: .leading, spacing: 12) {
+
+                Text("₹\(Int(plannedTotal)) • \(unpaidCount) unpaid")
+                    .font(.subheadline)
+                    .foregroundColor(.white)
+                
+                
+                ProgressView(
+                    value: spentTotal,
+                    total: plannedTotal == 0 ? 1 : plannedTotal
+                )
+                .progressViewStyle(.linear)
+                .tint(.green)
+                .scaleEffect(x: 1, y: 2.5)
+                .background(Color.white.opacity(0.6))
+                .animation(.easeInOut, value: spentTotal)
+                
+                HStack {
+                    VStack(spacing: 2) {
+                        Text("₹\(Int(spentTotal))")
+                            .font(.caption)
+                            .foregroundColor(.white)
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 8, height: 8)
+                            
+                            Text("Spent")
+                                .font(.caption)
+                                .foregroundColor(.white)
+                        }
+                    }
+                    .padding(.trailing)
+                    
+                    Spacer()
+                    
+                    VStack(spacing: 2) {
+                        Text("₹\(Int(plannedTotal))")
+                            .font(.caption)
+                            .foregroundColor(.white)
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color.white.opacity(0.6))
+                                .frame(width: 8, height: 8)
+                            
+                            Text("Planned")
+                                .font(.caption)
+                                .foregroundColor(.white)
+                        }
+                    }
+                    .padding(.leading)
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+            }
+        }
+        .padding(.horizontal)
+    }
+    
+    var isCurrentYear: Bool {
+        let now = Date()
+        let cal = Calendar.current
+        return selectedYear == cal.component(.year, from: now)
     }
 }

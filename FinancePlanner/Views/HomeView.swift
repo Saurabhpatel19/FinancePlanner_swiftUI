@@ -104,15 +104,13 @@ struct HomeView: View {
                 VStack(spacing: 24) {
 
                     monthChips
-                    monthSummary
                     
                     if monthExpenses.isEmpty {
                         emptyState
                     } else {
-                        if isCurrentMonth {
-                            progressSection
-                            fixedVariableChart
-                        }
+                        monthlyProgressSection
+                        monthlySummaryView
+                            .padding(.horizontal)
                         expenseList
                     }
                 }
@@ -172,7 +170,7 @@ struct HomeView: View {
                         .background(
                             Capsule()
                                 .fill(selectedMonthIndex == index
-                                      ? Color.accentColor
+                                      ? Color.darkPurple
                                       : Color(.systemGray5))
                         )
                         .foregroundColor(
@@ -219,22 +217,139 @@ struct HomeView: View {
         }
     }
     
-    private var progressSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-
-            Text("Spent ₹\(Int(spentTotal)) / Planned ₹\(Int(plannedTotal))")
-                .font(.caption)
-                .foregroundColor(.secondary)
-
-            ProgressView(value: spentTotal, total: plannedTotal == 0 ? 1 : plannedTotal)
-                .progressViewStyle(.linear)
-                .tint(.accentColor)
-                .scaleEffect(x: 1, y: 2.5, anchor: .center)   // ⬅️ height
+    private var monthlyProgressSection: some View {
+        PurpleGradientCard {
             
+            VStack(alignment: .leading, spacing: 12) {
+
+                Text(fullMonthTitle(month: selectedMonth.month, year: selectedMonth.year))
+                    .font(.title2.weight(.semibold))
+                    .foregroundColor(.white)
+
+                if isCurrentMonth {
+                    Text("₹\(Int(plannedTotal)) • \(unpaidCount) unpaid")
+                        .font(.subheadline)
+                        .foregroundColor(.white)
+                    
+                } else {
+                    Text("Planned Expense ₹\(Int(plannedTotal))")
+                        .font(.subheadline)
+                        .foregroundColor(.white)
+                }
+                
+                if isCurrentMonth {
+                    
+                    ProgressView(
+                        value: spentTotal,
+                        total: plannedTotal == 0 ? 1 : plannedTotal
+                    )
+                    .progressViewStyle(.linear)
+                    .tint(.green)
+                    .scaleEffect(x: 1, y: 2.5)
+                    .background(Color.white.opacity(0.6))
+                    .animation(.easeInOut, value: spentTotal)
+                    
+                    HStack {
+                        VStack(spacing: 2) {
+                            Text("₹\(Int(spentTotal))")
+                                .font(.caption)
+                                .foregroundColor(.white)
+                            HStack(spacing: 4) {
+                                Circle()
+                                        .fill(Color.green)
+                                        .frame(width: 8, height: 8)
+                                
+                                Text("Spent")
+                                    .font(.caption)
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        .padding(.trailing)
+                        
+                        Spacer()
+                        
+                        VStack(spacing: 2) {
+                            Text("₹\(Int(plannedTotal))")
+                                .font(.caption)
+                                .foregroundColor(.white)
+                            HStack(spacing: 4) {
+                                Circle()
+                                    .fill(Color.white.opacity(0.6))
+                                        .frame(width: 8, height: 8)
+                                
+                                Text("Planned")
+                                    .font(.caption)
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        .padding(.leading)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
         }
         .padding(.horizontal)
     }
+    
+    private var monthlySummaryView: some View {
+        VStack(alignment: .leading, spacing: 12) {
 
+            Text("Monthly Summary")
+                .font(.caption)
+                .foregroundColor(.primary.opacity(0.9))
+
+            summaryItem(
+                color: .primary,
+                title: "Fixed",
+                amount: fixedTotal
+            )
+
+            summaryItem(
+                color: .primary,
+                title: "Variable",
+                amount: variableTotal
+            )
+        }
+        .padding(.leading, 16)     // ⬅️ leading spacing inside card
+        .padding(.trailing, 16)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.white))
+        )
+        .shadow(
+            color: Color.black.opacity(0.3),
+            radius: 8,
+            y: 4
+        )
+    }
+
+
+
+    private func summaryItem(
+        color: Color,
+        title: String,
+        amount: Double
+    ) -> some View
+    {
+
+        HStack(alignment: .center,spacing: 6) {
+
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.primary)
+
+            Text("₹\(Int(amount))")
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.primary)
+        }
+    }
+
+    
     private var fixedVariableChart: some View {
         VStack(spacing: 12) {
 
