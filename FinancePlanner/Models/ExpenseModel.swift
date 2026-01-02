@@ -9,49 +9,6 @@
  import Foundation
  import SwiftData
 
-enum ExpenseType: String, Codable, CaseIterable, Identifiable {
-    case fixed
-    case variable
-
-    var id: Self { self }
-
-    var displayTitle: String {
-        switch self {
-        case .fixed:
-            return "Fixed"
-        case .variable:
-            return "Variable"
-        }
-    }
-}
-
-
- enum ExpenseFrequency: String, Codable, CaseIterable, Identifiable {
-     case oneTime
-     case monthly
-     case yearly
-
-     var id: Self { self }
-
-     // Display text for UI
-     var displayTitle: String {
-         switch self {
-         case .oneTime:
-             return "Once"
-         case .monthly:
-             return "Monthly"
-         case .yearly:
-             return "Yearly"
-         }
-     }
- }
-
- extension ExpenseFrequency {
-     var affectsFutureMonths: Bool {
-         self == .monthly
-     }
- }
-
  @Model
  class ExpenseModel {
 
@@ -192,9 +149,3 @@ enum ExpenseType: String, Codable, CaseIterable, Identifiable {
          }
      }
  }
-
-enum PaymentMethod: String, Codable, CaseIterable {
-    case creditCard = "Credit Card"
-    case bankTransfer = "Bank Transfer"
-    case cash = "Cash"
-}

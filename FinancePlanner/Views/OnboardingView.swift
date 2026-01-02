@@ -15,7 +15,7 @@ struct OnboardingView: View {
 
     var body: some View {
         VStack(spacing: 24) {
-
+            
             Spacer()
 
             Text("My Finance")

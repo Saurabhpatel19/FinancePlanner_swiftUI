@@ -52,7 +52,8 @@ struct AddEditExpenseView: View {
         expense: ExpenseModel,
         actionType: ExpenseActionType,
         context: ModelContext
-    ) {
+    )
+    {
         self.expense = expense
         self.actionType = actionType
         self.dataService = FinanceDataService(context: context)
