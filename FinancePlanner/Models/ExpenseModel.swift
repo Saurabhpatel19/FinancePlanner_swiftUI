@@ -75,11 +75,27 @@ enum ExpenseType: String, Codable, CaseIterable, Identifiable {
      var endMonth: Int?
      var endYear: Int?
      
-     // Payment state
+     // MARK: - Due / ECS
+     /// Day of month (1–31), same for all recurring instances
+     var dueDay: Int?
+
+     // MARK: - Payment Status (HOME ONLY)
+     /// Controlled only from Home checkbox
      var isPaid: Bool
-     
-     // Payment
-     var paidDate: Date?
+
+     // MARK: - Payment Details (Optional Metadata)
+     /// Actual payment date
+     var paymentDate: Date?
+
+     /// How it was paid (Card / Bank / Cash)
+     var paymentMethod: PaymentMethod?
+
+     /// From where (SBI, ICICI CC, Cash, etc.)
+     var paymentSource: String?
+
+     // MARK: - Notes (Independent)
+     /// Free-text notes for reconciliation / context
+     var note: String?
 
      init(
          id: UUID = UUID(),
@@ -94,8 +110,12 @@ enum ExpenseType: String, Codable, CaseIterable, Identifiable {
          startYear: Int? = nil,
          endMonth: Int? = nil,
          endYear: Int? = nil,
+         dueDay: Int? = nil,
          isPaid: Bool = false,
-         paidDate: Date? = nil
+         paymentDate: Date? = nil,
+         paymentMethod: PaymentMethod? = nil,
+         paymentSource: String? = nil,
+         note: String? = nil,
      ) {
          self.id = id
          self.seriesId = seriesId
@@ -109,8 +129,12 @@ enum ExpenseType: String, Codable, CaseIterable, Identifiable {
          self.startYear = startYear
          self.endMonth = endMonth
          self.endYear = endYear
+         self.dueDay = dueDay
          self.isPaid = isPaid
-         self.paidDate = paidDate
+         self.paymentDate = paymentDate
+         self.paymentMethod = paymentMethod
+         self.paymentSource = paymentSource
+         self.note = note
      }
  }
 
@@ -118,28 +142,59 @@ enum ExpenseType: String, Codable, CaseIterable, Identifiable {
  // MARK: - Paid Logic (FINAL)
  extension ExpenseModel {
 
+     func togglePaid() {
+         if isPaid {
+             // MARK: - Unmark Paid
+             isPaid = false
+             paymentDate = nil
+             paymentMethod = nil
+             paymentSource = nil
+         } else {
+             // MARK: - Mark Paid
+             isPaid = true
+             // ⚠️ Do NOT set paymentDate here
+             // Payment details are added via bottom sheet (optional)
+         }
+     }
+     
      // Monthly (Home)
      func togglePaid(forMonth month: Int, year: Int) {
          guard self.month == month, self.year == year else { return }
 
-         isPaid.toggle()
-
          if isPaid {
-             paidDate = Date()
+             // MARK: - Unmark Paid
+             isPaid = false
+             paymentDate = nil
+             paymentMethod = nil
+             paymentSource = nil
          } else {
-             paidDate = nil
+             // MARK: - Mark Paid
+             isPaid = true
+             // ⚠️ Do NOT set paymentDate here
+             // Payment details are added via bottom sheet (optional)
          }
      }
 
      func togglePaid(year: Int) {
          guard self.year == year else { return }
 
-         isPaid.toggle()
-
          if isPaid {
-             paidDate = Date()
+             // MARK: - Unmark Paid
+             isPaid = false
+             paymentDate = nil
+             paymentMethod = nil
+             paymentSource = nil
          } else {
-             paidDate = nil
+             // MARK: - Mark Paid
+             isPaid = true
+             // ⚠️ Do NOT set paymentDate here
+             // Payment details are added via bottom sheet (optional)
          }
      }
  }
+
+enum PaymentMethod: String, Codable, CaseIterable {
+    case creditCard = "Credit Card"
+    case bankTransfer = "Bank Transfer"
+    case cash = "Cash"
+}

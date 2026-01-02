@@ -1,5 +1,5 @@
 //
-//  HomeExpenseCard.swift
+//  ExpenseCard.swift
 //  FinancePlanner
 //
 //  Created by Saurabh on 30/12/25.
@@ -7,16 +7,17 @@
 
 import SwiftUI
 
-struct HomeExpenseCard: View {
+struct ExpenseCard: View {
 
     let expense: ExpenseModel
-    let isCurrentMonth: Bool
+    var selectedYear: Int?
+    var isCurrentMonth: Bool = false
     let onTogglePaid: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
 
-            if isCurrentMonth {
+            if isCurrentMonth || selectedYear != nil {
                 Button(action: onTogglePaid) {
                     Image(systemName: expense.isPaid
                           ? "checkmark.circle.fill"
@@ -27,15 +28,19 @@ struct HomeExpenseCard: View {
                         )
                 }
                 .buttonStyle(.plain)
+                .scaleEffect(1.4)
             }
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(expense.name)
                     .font(.headline)
 
-                Text("\(expense.frequency.rawValue) • \(expense.type.rawValue)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                if let dueDay = expense.dueDay {
+                    let monthYearTitle = monthYearTitle(month: expense.month, year: expense.year)
+                    Text("Due: \(dueDay) \(monthYearTitle)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
 
             Spacer()
@@ -48,6 +53,17 @@ struct HomeExpenseCard: View {
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color(.systemGray6))
         )
+    }
+    
+    func monthYearTitle(month: Int, year: Int) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM yyyy"
+
+        let date = Calendar.current.date(
+            from: DateComponents(year: year, month: month)
+        )!
+
+        return formatter.string(from: date)
     }
 }
 

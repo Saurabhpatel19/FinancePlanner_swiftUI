@@ -37,7 +37,7 @@ struct AllExpenseCard: View {
             }
 
             // MARK: - Section 2: Payment Info (Only if paid)
-            if let paidDate = expense.paidDate {
+            if let paidDate = expense.paymentDate {
                 Divider()
 
                 VStack(alignment: .leading, spacing: 8) {

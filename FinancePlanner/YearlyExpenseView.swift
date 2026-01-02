@@ -19,13 +19,19 @@ import SwiftData
 
 struct YearlyExpenseView: View {
 
+    @Environment(\.modelContext) private var context
+
     // MARK: - Data
     @Query private var expenses: [ExpenseModel]
 
     // MARK: - State
     @State private var selectedYear =
         Calendar.current.component(.year, from: Date())
-
+    
+    @State private var editingExpense: ExpenseModel?
+    
+    @State private var showingPaymentSheet: ExpenseModel?
+    
     // MARK: - Computed
     private var yearlyExpenses: [ExpenseModel] {
         let yearlyExpenses = expenses.filter { $0.frequency == .yearly && $0.year == selectedYear }
@@ -72,6 +78,20 @@ struct YearlyExpenseView: View {
                 selectedYear = availableYears.first!
             }
         }
+        .sheet(item: $editingExpense) { expense in
+            AddEditExpenseView(
+                expense: expense,
+                actionType: .update,
+                context: context
+            )
+        }
+        
+        .sheet(item: $showingPaymentSheet) { expense in
+            PaymentDetailsSheet(
+                expense: expense,
+                context: context
+            )
+        }
     }
 }
 
@@ -113,15 +133,27 @@ private extension YearlyExpenseView {
 
 // MARK: - Expense List
 private extension YearlyExpenseView {
-
+    
     var yearlyExpenseList: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
                 ForEach(yearlyExpenses) { expense in
-                    YearlyExpenseCard(
+                    ExpenseCard(
                         expense: expense,
-                        year: selectedYear
-                    )
+                        selectedYear: selectedYear
+                    ) {
+                        expense.togglePaid(
+                            forMonth: expense.month,
+                            year: expense.year
+                        )
+                        
+                        if expense.isPaid {
+                            showingPaymentSheet = expense
+                        }
+                    }
+                    .onTapGesture {
+                        editingExpense = expense
+                    }
                 }
             }
             .padding(.horizontal)

@@ -83,61 +83,12 @@ final class FinanceDataService {
     }
     */
     
-    func rebuildMonthlySeries(expense: ExpenseModel) {
-
-        let descriptor = FetchDescriptor<ExpenseModel>()
-        guard let allExpenses = try? context.fetch(descriptor) else { return }
-
-        // 1️⃣ Existing monthly series
-        let oldMonthly = allExpenses.filter {
-            $0.seriesId == expense.seriesId &&
-            $0.frequency == .monthly
-        }
-
-        guard let first = oldMonthly.first,
-              let newStartMonth = expense.startMonth,
-              let newStartYear = expense.startYear,
-              let newEndMonth = expense.endMonth,
-              let newEndYear = expense.endYear
-        else { return }
-
-        // 2️⃣ If boundary unchanged → series-level update only
-        if first.startMonth == newStartMonth,
-           first.startYear == newStartYear,
-           first.endMonth == newEndMonth,
-           first.endYear == newEndYear {
-
-            for exp in oldMonthly {
-                exp.name = expense.name
-                exp.amount = expense.amount
-                exp.type = expense.type
-            }
-
-            try? context.save()
-            return
-        }
-
-        // 3️⃣ Snapshot paid state
-        var paidSnapshot: [String: (Bool, Date?)] = [:]
-        for exp in oldMonthly {
-            let key = "\(exp.year)-\(exp.month)"
-            paidSnapshot[key] = (exp.isPaid, exp.paidDate)
-        }
-
-        // 4️⃣ Delete old monthly series
-        for exp in oldMonthly {
-            context.delete(exp)
-        }
-
-        handleAdd(expense, paidSnapshot: paidSnapshot)
-        return
-    }
 }
 
 private extension FinanceDataService {
 
     // MARK: - Add
-    func handleAdd(_ expense: ExpenseModel,paidSnapshot: [String: (Bool, Date?)] = [:]) {
+    func handleAdd(_ expense: ExpenseModel,paidSnapshot: [String: (Bool, Date?, PaymentMethod?, String?)] = [:]) {
 
         let seriesId = expense.seriesId
         let calendar = Calendar.current
@@ -207,20 +158,22 @@ private extension FinanceDataService {
             print("inner endyear \(endYear)")
             let copy = makeCopy(
                 from: expense,
+                seriesId: seriesId,
                 month: month,
                 year: year,
                 startMonth: expense.frequency == .monthly ? startMonth : nil,
                 startYear: expense.frequency != .oneTime ? startYear : nil,
                 endMonth: expense.frequency == .monthly ? endMonth : nil,
-                endYear: expense.frequency != .oneTime ? endYear : nil,
-                seriesId: seriesId
+                endYear: expense.frequency != .oneTime ? endYear : nil
             )
 
             // restore paid state if exists
             let key = "\(expense.year)-\(expense.month)"
             if let snapshot = paidSnapshot[key] {
                 copy.isPaid = snapshot.0
-                copy.paidDate = snapshot.1
+                copy.paymentDate = snapshot.1
+                copy.paymentMethod = snapshot.2
+                copy.paymentSource = snapshot.3
             }
             
             
@@ -243,6 +196,60 @@ private extension FinanceDataService {
                 year += 1   // month stays fixed
             }
         }
+    }
+
+    // MARK: - Rebuild Monthly Expense
+    func rebuildMonthlySeries(expense: ExpenseModel) {
+
+        let descriptor = FetchDescriptor<ExpenseModel>()
+        guard let allExpenses = try? context.fetch(descriptor) else { return }
+
+        // 1️⃣ Existing monthly series
+        let oldMonthly = allExpenses.filter {
+            $0.seriesId == expense.seriesId &&
+            $0.frequency == .monthly
+        }
+
+        guard let first = oldMonthly.first,
+              let newStartMonth = expense.startMonth,
+              let newStartYear = expense.startYear,
+              let newEndMonth = expense.endMonth,
+              let newEndYear = expense.endYear
+        else { return }
+
+        // 2️⃣ If boundary unchanged → series-level update only
+        if first.startMonth == newStartMonth,
+           first.startYear == newStartYear,
+           first.endMonth == newEndMonth,
+           first.endYear == newEndYear {
+
+            for exp in oldMonthly {
+                exp.name = expense.name
+                exp.amount = expense.amount
+                exp.type = expense.type
+                
+                exp.dueDay = expense.dueDay
+                exp.note = expense.note
+            }
+
+            try? context.save()
+            return
+        }
+
+        // 3️⃣ Snapshot paid state
+        var paidSnapshot: [String: (Bool, Date?, PaymentMethod?, String?)] = [:]
+        for exp in oldMonthly {
+            let key = "\(exp.year)-\(exp.month)"
+            paidSnapshot[key] = (exp.isPaid, exp.paymentDate, exp.paymentMethod, exp.paymentSource)
+        }
+
+        // 4️⃣ Delete old monthly series
+        for exp in oldMonthly {
+            context.delete(exp)
+        }
+
+        handleAdd(expense, paidSnapshot: paidSnapshot)
+        return
     }
 
     // MARK: - Update
@@ -275,6 +282,9 @@ private extension FinanceDataService {
             exp.name = expense.name
             exp.amount = expense.amount
             exp.type = expense.type
+            
+            exp.dueDay = expense.dueDay
+            exp.note = expense.note
         }
     }
 
@@ -306,16 +316,15 @@ private extension FinanceDataService {
     // MARK: - Copy helper
     func makeCopy(
         from expense: ExpenseModel,
+        seriesId: UUID,
         month: Int,
         year: Int,
-        startMonth: Int?,
-        startYear: Int?,
-        endMonth:Int?,
-        endYear:Int?,
-        seriesId: UUID
+        startMonth: Int? = nil,
+        startYear: Int? = nil,
+        endMonth: Int? = nil,
+        endYear: Int? = nil,
     ) -> ExpenseModel
     {
-
         ExpenseModel(
             seriesId: seriesId,
             name: expense.name,
@@ -328,8 +337,9 @@ private extension FinanceDataService {
             startYear: startYear,
             endMonth: endMonth,
             endYear: endYear,
+            dueDay: expense.dueDay,
             isPaid: false,
-            paidDate: nil
+            note: expense.note,
         )
     }
 }

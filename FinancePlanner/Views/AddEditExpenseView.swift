@@ -14,6 +14,7 @@ struct AddEditExpenseView: View {
 
     // MARK: - Environment
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
 
     // MARK: - Inputs
     let expense: ExpenseModel
@@ -35,6 +36,11 @@ struct AddEditExpenseView: View {
     @State private var endMonth: Int
     @State private var endYear: Int
     
+    @State private var dueDay: Int?
+    @State private var note: String
+    
+    @State private var showPaymentDetailsSheet = false
+
     // MARK: - UI State
     @State private var showApplyScopeDialog = false
     
@@ -67,6 +73,9 @@ struct AddEditExpenseView: View {
         _endMonth = State(initialValue: expense.endMonth ?? expense.month)
         _endYear  = State(initialValue: expense.endYear  ?? expense.year)
 
+        _dueDay = State(initialValue: expense.dueDay)
+        _note   = State(initialValue: expense.note ?? "")
+
     }
 
     // MARK: - Body
@@ -95,9 +104,19 @@ struct AddEditExpenseView: View {
 
                     // MARK: - Schedule
                     Section("Schedule") {
-                        Picker("Frequency", selection: $frequency) {
-                            ForEach(ExpenseFrequency.allCases) { freq in
-                                Text(freq.displayTitle).tag(freq)
+                        
+                        if actionType == .add {
+                            Picker("Frequency", selection: $frequency) {
+                                ForEach(ExpenseFrequency.allCases) { freq in
+                                    Text(freq.displayTitle).tag(freq)
+                                }
+                            }
+                        } else {
+                            HStack {
+                                Text("Frequency")
+                                Spacer()
+                                Text(frequency.displayTitle)
+                                    .foregroundColor(.secondary)
                             }
                         }
 
@@ -160,7 +179,17 @@ struct AddEditExpenseView: View {
                         
                     }
 
+                    // MARK: - Due / ECS Day
+                    Section("Due / ECS Day") {
+                        Picker("Day", selection: $dueDay) {
+                            Text("None").tag(Int?.none)
+                            ForEach(1...31, id: \.self) {
+                                Text("\($0)").tag(Optional($0))
+                            }
+                        }
+                    }
 
+                    
                     // MARK: - Type
                     Section("Type") {
                         Picker("Expense Type", selection: $type) {
@@ -172,6 +201,30 @@ struct AddEditExpenseView: View {
                         .pickerStyle(.segmented)
                     }
 
+                    // MARK: - Notes
+                    Section("Notes") {
+                        TextEditor(text: $note)
+                            .frame(minHeight: 80)
+                    }
+
+                    // MARK: - Payment (Read-only)
+                    if actionType == .update, expense.isPaid {
+
+                        Section("Payment") {
+
+                            HStack {
+                                Text("Status")
+                                Spacer()
+                                Text("Paid")
+                                    .foregroundColor(.green)
+                            }
+
+                            Button("View / Edit Payment Details") {
+                                showPaymentDetailsSheet = true
+                            }
+                        }
+                    }
+                    
                     // MARK: - Delete (Edit only)
                     if actionType == .update {
                         Section {
@@ -185,8 +238,6 @@ struct AddEditExpenseView: View {
                 }
             }
             .animation(.easeInOut, value: validationMessage)
-
-            
             .navigationTitle(actionType == .add ? "Add Expense" : "Edit Expense")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -205,6 +256,12 @@ struct AddEditExpenseView: View {
                     }
                     .disabled(!isValid)
                 }
+            }
+            .sheet(isPresented: $showPaymentDetailsSheet) {
+                PaymentDetailsSheet(
+                    expense: expense,
+                    context: context
+                )
             }
         }
         // MARK: - Apply Scope Dialog
@@ -300,6 +357,12 @@ private extension AddEditExpenseView {
             }
         }
 
+        if let day = dueDay, day < 1 || day > 31 {
+            validationMessage = "Enter a valid due day."
+            return false
+        }
+
+        
         return true
     }
 
@@ -348,7 +411,10 @@ private extension AddEditExpenseView {
             expense.month = month
             expense.year = startYear
         }
-                
+              
+        expense.dueDay = dueDay
+        expense.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        
         // 🔥 EDIT CASE: ask confirmation if future months are involved
         if actionType == .update && expense.frequency != .oneTime {
             showApplyScopeDialog = true

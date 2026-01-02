@@ -2,34 +2,36 @@
 //  HomeView.swift
 //  FinancePlanner
 //
-//  Created by Saurabh on 25/12/25.
+//  Created by Saurabh on 01/01/26.
 //
 
 
 import SwiftUI
 import SwiftData
+import Charts
 
 struct HomeView: View {
 
-    // MARK: - Data
     @Environment(\.modelContext) private var context
-    @Query private var expenses: [ExpenseModel]
 
-    // MARK: - UI State
+    @Query private var expenses: [ExpenseModel]
     @State private var selectedMonthIndex = 0
+
     @State private var showAddExpense = false
     @State private var editingExpense: ExpenseModel?
-
+    
+    @State private var showingPaymentSheet: ExpenseModel?
+    
     // MARK: - Month UI (DISPLAY ONLY)
     private var monthsUI: [MonthUI] {
         MonthUI.generate()
     }
-
+    
     private var selectedMonth: MonthUI {
         monthsUI[selectedMonthIndex]
     }
 
-    // MARK: - Filtered Expenses
+    // MARK: - Derived Values
     private var monthExpenses: [ExpenseModel] {
         expenses.filter {
             $0.month == selectedMonth.month &&
@@ -37,47 +39,55 @@ struct HomeView: View {
         }
     }
 
-    private var totalAmount: Int {
-        Int(monthExpenses.reduce(0) { $0 + $1.amount })
+    private var plannedTotal: Double {
+        monthExpenses.reduce(0) { $0 + $1.amount }
+    }
+
+    private var spentTotal: Double {
+        monthExpenses
+            .filter { $0.isPaid }
+            .reduce(0) { $0 + $1.amount }
     }
 
     private var unpaidCount: Int {
         monthExpenses.filter { !$0.isPaid }.count
     }
 
-    // MARK: - Body
+    private var fixedTotal: Double {
+        monthExpenses
+            .filter { $0.type == .fixed }
+            .reduce(0) { $0 + $1.amount }
+    }
+
+    private var variableTotal: Double {
+        monthExpenses
+            .filter { $0.type == .variable }
+            .reduce(0) { $0 + $1.amount }
+    }
+
+    // MARK: - UI
     var body: some View {
         NavigationStack {
-            VStack(spacing: 16) {
+            ScrollView {
+                VStack(spacing: 24) {
 
-                monthPicker
-                monthHeader
-
-                ScrollView {
+                    monthChips
+                    monthSummary
+                    
                     if monthExpenses.isEmpty {
                         emptyState
                     } else {
-                        LazyVStack(spacing: 12) {
-                            ForEach(monthExpenses) { expense in
-                                HomeExpenseCard(
-                                    expense: expense,
-                                    isCurrentMonth: isCurrentMonth
-                                ) {
-                                    expense.togglePaid(
-                                        forMonth: expense.month,
-                                        year: expense.year
-                                    )
-                                }
-                                .onTapGesture {
-                                    editingExpense = expense
-                                }
-                            }
+                        if isCurrentMonth {
+                            progressSection
+                            fixedVariableChart
                         }
-                        .padding(.horizontal)
+                        expenseList
                     }
                 }
+                .padding(.horizontal)
             }
             .navigationTitle("My Finance")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 Button {
                     showAddExpense = true
@@ -108,13 +118,17 @@ struct HomeView: View {
                 context: context
             )
         }
+        
+        .sheet(item: $showingPaymentSheet) { expense in
+            PaymentDetailsSheet(
+                expense: expense,
+                context: context
+            )
+        }
     }
-}
-
-// MARK: - Subviews
-private extension HomeView {
-
-    var monthPicker: some View {
+    
+    //MARK: -
+    private var monthChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
                 ForEach(monthsUI.indices, id: \.self) { index in
@@ -139,17 +153,16 @@ private extension HomeView {
             .padding(.horizontal)
         }
     }
-
-    var monthHeader: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        
+    private var monthSummary: some View {
+        VStack(spacing: 6) {
             Text(selectedMonth.title)
-                .font(.largeTitle.bold())
+                .font(.title2.weight(.semibold))
 
-            Text("₹\(totalAmount) • \(unpaidCount) unpaid")
+            Text("₹\(Int(plannedTotal)) • \(unpaidCount) unpaid")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
         }
-        .padding(.horizontal)
     }
 
     var emptyState: some View {
@@ -167,7 +180,99 @@ private extension HomeView {
                 .foregroundColor(.secondary)
         }
     }
+    
+    private var progressSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
 
+            Text("Spent ₹\(Int(spentTotal)) / Planned ₹\(Int(plannedTotal))")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            ProgressView(value: spentTotal, total: plannedTotal == 0 ? 1 : plannedTotal)
+                .progressViewStyle(.linear)
+                .tint(.accentColor)
+                .scaleEffect(x: 1, y: 2.5, anchor: .center)   // ⬅️ height
+            
+        }
+    }
+
+    private var fixedVariableChart: some View {
+        VStack(spacing: 12) {
+
+            Chart {
+                if fixedTotal > 0 {
+                    SectorMark(
+                        angle: .value("Fixed", fixedTotal)
+                    )
+                    .foregroundStyle(Color.blue.opacity(0.6))
+                }
+
+                if variableTotal > 0 {
+                    SectorMark(
+                        angle: .value("Variable", variableTotal)
+                    )
+                    .foregroundStyle(Color.gray.opacity(0.6))
+                }
+            }
+            .frame(height: 160)
+
+            // 👇 Simple legend with values
+            HStack(spacing: 24) {
+
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(Color.blue.opacity(0.6))
+                        .frame(width: 10, height: 10)
+
+                    Text("Fixed ₹\(Int(fixedTotal))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(Color.gray.opacity(0.6))
+                        .frame(width: 10, height: 10)
+
+                    Text("Variable ₹\(Int(variableTotal))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+    }
+
+    private var expenseList: some View {
+        VStack(spacing: 12) {
+
+            if monthExpenses.isEmpty {
+                emptyState
+            } else {
+                LazyVStack(spacing: 12) {
+                    ForEach(monthExpenses) { expense in
+                        ExpenseCard(
+                            expense: expense,
+                            isCurrentMonth: isCurrentMonth
+                        ) {
+                            expense.togglePaid(
+                                forMonth: expense.month,
+                                year: expense.year
+                            )
+                            
+                            if expense.isPaid {
+                                showingPaymentSheet = expense
+                            }
+                        }
+                        .onTapGesture {
+                            editingExpense = expense
+                        }
+                    }
+                }
+                .padding(.horizontal)
+            }
+        }
+    }
+    
     var isCurrentMonth: Bool {
         let now = Date()
         let cal = Calendar.current
@@ -175,5 +280,3 @@ private extension HomeView {
                selectedMonth.year == cal.component(.year, from: now)
     }
 }
-
-

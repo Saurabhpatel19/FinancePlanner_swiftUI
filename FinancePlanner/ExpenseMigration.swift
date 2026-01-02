@@ -10,6 +10,7 @@ import SwiftData
 
 struct ExpenseMigration {
 
+    /*
     static func migratePaidState(context: ModelContext) {
         let descriptor = FetchDescriptor<ExpenseModel>()
         
@@ -33,4 +34,5 @@ struct ExpenseMigration {
             print("❌ Migration failed:", error)
         }
     }
+     */
 }

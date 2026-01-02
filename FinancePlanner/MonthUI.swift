@@ -8,7 +8,7 @@
 
 import Foundation
 
-struct MonthUI: Identifiable {
+struct MonthUI: Identifiable, Equatable {
     let id = UUID()
     let month: Int       // 1...12
     let year: Int

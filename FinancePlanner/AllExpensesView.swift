@@ -105,9 +105,9 @@ struct AllExpensesView: View {
                         .fill(Color(.blue).opacity(0.7))
                 )
 
-                // Divider for UIKit separation
-                Divider()
-                    .background(Color(.systemGray4))
+//                // Divider for UIKit separation
+//                Divider()
+//                    .background(Color(.systemGray4))
             }
         }
         .buttonStyle(.plain)
