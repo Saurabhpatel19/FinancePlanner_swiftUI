@@ -31,7 +31,8 @@ struct YearlyExpenseView: View {
     @State private var editingExpense: ExpenseModel?
     
     @State private var showingPaymentSheet: ExpenseModel?
-    
+    @State private var showAddExpense = false
+
     // MARK: - Computed
     private var yearlyExpenses: [ExpenseModel] {
         let yearlyExpenses = expenses.filter { $0.frequency == .yearly && $0.year == selectedYear }
@@ -56,43 +57,68 @@ struct YearlyExpenseView: View {
 
     // MARK: - Body
     var body: some View {
-        VStack(spacing: 16) {
+        NavigationStack {
+            VStack(spacing: 16) {
 
-            // Title
-            Text("Yearly Expenses")
-                .font(.title2.bold())
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal)
+                // Title
+                Text("Yearly Expenses")
+                    .font(.title2.bold())
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
 
-            // Year chips
-            yearChips
+                // Year chips
+                yearChips
 
-            // Expense list
-            yearlyExpenseList
+                // Expense list
+                yearlyExpenseList
 
-            Spacer()
-        }
-        .padding(.top)
-        .onAppear {
-            if !availableYears.contains(selectedYear) {
-                selectedYear = availableYears.first!
+                Spacer()
+            }
+            .padding(.top)
+            .onAppear {
+                if !availableYears.contains(selectedYear) {
+                    selectedYear = availableYears.first!
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showAddExpense = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                }
+            }
+            .sheet(isPresented: $showAddExpense) {
+                AddEditExpenseView(
+                    expense: ExpenseModel(
+                        name: "",
+                        amount: 0,
+                        type: .fixed,
+                        frequency: .monthly,
+                        month: 0,
+                        year: selectedYear
+                    ),
+                    actionType: .add,
+                    context: context
+                )
+            }
+            .sheet(item: $editingExpense) { expense in
+                AddEditExpenseView(
+                    expense: expense,
+                    actionType: .update,
+                    context: context
+                )
+            }
+            .sheet(item: $showingPaymentSheet) { expense in
+                PaymentDetailsSheet(
+                    expense: expense,
+                    context: context
+                )
             }
         }
-        .sheet(item: $editingExpense) { expense in
-            AddEditExpenseView(
-                expense: expense,
-                actionType: .update,
-                context: context
-            )
-        }
-        
-        .sheet(item: $showingPaymentSheet) { expense in
-            PaymentDetailsSheet(
-                expense: expense,
-                context: context
-            )
-        }
     }
+
 }
 
 // MARK: - Year Chips

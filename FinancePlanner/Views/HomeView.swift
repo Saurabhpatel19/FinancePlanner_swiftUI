@@ -10,8 +10,15 @@ import SwiftUI
 import SwiftData
 import Charts
 
+
 struct HomeView: View {
 
+    private struct MonthItem: Identifiable, Equatable {
+        let id = UUID()
+        let month: Int
+        let year: Int
+    }
+    
     @Environment(\.modelContext) private var context
 
     @Query private var expenses: [ExpenseModel]
@@ -22,13 +29,38 @@ struct HomeView: View {
     
     @State private var showingPaymentSheet: ExpenseModel?
     
-    // MARK: - Month UI (DISPLAY ONLY)
-    private var monthsUI: [MonthUI] {
-        MonthUI.generate()
+    // MARK: - Month Data (Dynamic)
+    private var months: [MonthItem] {
+        let calendar = Calendar.current
+        let now = Date()
+
+        let currentMonth = calendar.component(.month, from: now)
+        let currentYear = calendar.component(.year, from: now)
+
+        var result: [MonthItem] = []
+
+        // current year (current month → Dec)
+        for m in currentMonth...12 {
+            result.append(MonthItem(month: m, year: currentYear))
+        }
+
+        // next year (Jan → Dec)
+        for m in 1...12 {
+            result.append(MonthItem(month: m, year: currentYear + 1))
+        }
+
+        // optional extra year if late in year
+        if currentMonth >= 10 {
+            for m in 1...12 {
+                result.append(MonthItem(month: m, year: currentYear + 2))
+            }
+        }
+
+        return result
     }
-    
-    private var selectedMonth: MonthUI {
-        monthsUI[selectedMonthIndex]
+
+    private var selectedMonth: MonthItem {
+        months[selectedMonthIndex]
     }
 
     // MARK: - Derived Values
@@ -131,9 +163,10 @@ struct HomeView: View {
     private var monthChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
-                ForEach(monthsUI.indices, id: \.self) { index in
-                    let month = monthsUI[index]
-                    Text(month.shortTitle)
+                ForEach(months.indices, id: \.self) { index in
+                    let month = months[index]
+
+                    Text(shortMonthTitle(month: month.month, year: month.year))
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         .background(
@@ -150,18 +183,23 @@ struct HomeView: View {
                         }
                 }
             }
-            .padding(.horizontal)
         }
     }
         
     private var monthSummary: some View {
         VStack(spacing: 6) {
-            Text(selectedMonth.title)
+            Text(fullMonthTitle(month: selectedMonth.month, year: selectedMonth.year))
                 .font(.title2.weight(.semibold))
 
-            Text("₹\(Int(plannedTotal)) • \(unpaidCount) unpaid")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+            if isCurrentMonth {
+                Text("₹\(Int(plannedTotal)) • \(unpaidCount) unpaid")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            } else {
+                Text("Expected Expense ₹\(Int(plannedTotal))")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
         }
     }
 
@@ -194,6 +232,7 @@ struct HomeView: View {
                 .scaleEffect(x: 1, y: 2.5, anchor: .center)   // ⬅️ height
             
         }
+        .padding(.horizontal)
     }
 
     private var fixedVariableChart: some View {
@@ -268,7 +307,6 @@ struct HomeView: View {
                         }
                     }
                 }
-                .padding(.horizontal)
             }
         }
     }
@@ -279,4 +317,27 @@ struct HomeView: View {
         return selectedMonth.month == cal.component(.month, from: now) &&
                selectedMonth.year == cal.component(.year, from: now)
     }
+    
+    private func fullMonthTitle(month: Int, year: Int) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM yyyy"
+
+        let date = Calendar.current.date(
+            from: DateComponents(year: year, month: month)
+        )!
+
+        return formatter.string(from: date)
+    }
+
+    private func shortMonthTitle(month: Int, year: Int) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM yy"
+
+        let date = Calendar.current.date(
+            from: DateComponents(year: year, month: month)
+        )!
+
+        return formatter.string(from: date)
+    }
+
 }
