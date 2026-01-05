@@ -51,7 +51,12 @@ struct ExpenseCard: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color(.systemGray6))
+                .fill(Color(.white))
+        )
+        .shadow(
+            color: Color.black.opacity(0.2),
+            radius: 8,
+            y: 4
         )
     }
     

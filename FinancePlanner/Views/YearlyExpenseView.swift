@@ -230,7 +230,7 @@ private extension YearlyExpenseView {
                 .animation(.easeInOut, value: spentTotal)
                 
                 HStack {
-                    VStack(spacing: 2) {
+                    VStack(alignment: .leading, spacing: 2) {
                         Text("₹\(Int(spentTotal))")
                             .font(.caption)
                             .foregroundColor(.white)
@@ -244,11 +244,11 @@ private extension YearlyExpenseView {
                                 .foregroundColor(.white)
                         }
                     }
-                    .padding(.trailing)
-                    
+
                     Spacer()
-                    
-                    VStack(spacing: 2) {
+
+                    // Planned (Trailing)
+                    VStack(alignment: .trailing, spacing: 2) {
                         Text("₹\(Int(plannedTotal))")
                             .font(.caption)
                             .foregroundColor(.white)
@@ -262,9 +262,9 @@ private extension YearlyExpenseView {
                                 .foregroundColor(.white)
                         }
                     }
-                    .padding(.leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .center)
+                .frame(maxWidth: .infinity)
+
             }
         }
         .padding(.horizontal)
