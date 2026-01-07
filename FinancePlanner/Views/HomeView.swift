@@ -130,9 +130,6 @@ struct HomeView: View {
                             // Monthly progress card
                             monthlyProgressSection
                             
-                            // Stats grid
-                            statsGrid
-                            
                             // Fixed vs Variable breakdown
                             breakdownCard
                             
@@ -303,15 +300,15 @@ struct HomeView: View {
             if isCurrentMonth {
                 // Progress bar
                 VStack(spacing: 8) {
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(ThemeColors.cardBorder)
-                        
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(ThemeGradients.positiveGradient)
-                            .frame(width: plannedTotal == 0 ? 0 : CGFloat(spentTotal / plannedTotal) * UIScreen.main.bounds.width * 0.7)
-                    }
-                    .frame(height: 8)
+                    ProgressView(
+                        value: spentTotal,
+                        total: plannedTotal == 0 ? 1 : plannedTotal
+                    )
+                    .progressViewStyle(.linear)
+                    .tint(ThemeGradients.positiveGradient)
+                    .scaleEffect(x: 1, y: 2.5)
+                    .background(Color.white.opacity(0.6))
+                    .animation(.easeInOut, value: spentTotal)
                     
                     HStack(spacing: 16) {
                         VStack(alignment: .leading, spacing: 2) {
@@ -342,6 +339,16 @@ struct HomeView: View {
                                 .foregroundColor(ThemeColors.textPrimary)
                         }
                     }
+                }
+            } else {
+                // Expected expense card (non-current month)
+                VStack(spacing: 8) {
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(ThemeColors.cardBorder)
+                    }
+                    .frame(height: 0)
+                    .frame(height: 0)
                 }
             }
         }

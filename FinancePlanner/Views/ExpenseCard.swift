@@ -32,10 +32,19 @@ struct ExpenseCard: View {
                     .buttonStyle(.plain)
                 }
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(expense.name)
-                        .font(.system(size: 15, weight: .semibold, design: .default))
-                        .foregroundColor(ThemeColors.textPrimary)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 8) {
+                        Text(expense.name)
+                            .font(.system(size: 15, weight: .semibold, design: .default))
+                            .foregroundColor(ThemeColors.textPrimary)
+                        
+                        if let dueDay = expense.dueDay {
+                            let monthName = getMonthName(month: expense.month)
+                            Text("Due: \(dueDay) \(monthName)")
+                                .font(.caption2)
+                                .foregroundColor(ThemeColors.textSecondary)
+                        }
+                    }
 
                     HStack(spacing: 8) {
                         // Frequency badge
@@ -75,73 +84,16 @@ struct ExpenseCard: View {
                 }
             }
             .padding(14)
-            
-            // Details row
-            VStack(spacing: 12) {
-                Divider()
-                    .background(ThemeColors.cardBorder)
-                
-                HStack(spacing: 16) {
-                    // Due day
-                    if let dueDay = expense.dueDay {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Due Day")
-                                .font(.caption2)
-                                .foregroundColor(ThemeColors.textSecondary)
-                            
-                            Text("\(dueDay)")
-                                .font(.system(size: 14, weight: .semibold, design: .default))
-                                .foregroundColor(ThemeColors.textPrimary)
-                        }
-                    }
-                    
-                    Spacer()
-                    
-                    // Month/Year
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("Date")
-                            .font(.caption2)
-                            .foregroundColor(ThemeColors.textSecondary)
-                        
-                        Text(monthYearTitle(month: expense.month, year: expense.year))
-                            .font(.system(size: 14, weight: .semibold, design: .default))
-                            .foregroundColor(ThemeColors.textPrimary)
-                    }
-                }
-                .padding(0)
-                
-                Divider()
-                    .background(ThemeColors.cardBorder)
-                
-                // Notes
-                if let note = expense.note, !note.isEmpty {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Notes")
-                            .font(.caption2)
-                            .foregroundColor(ThemeColors.textSecondary)
-                        
-                        Text(note)
-                            .font(.caption)
-                            .foregroundColor(ThemeColors.textSecondary)
-                            .lineLimit(2)
-                    }
-                }
-            }
-            .padding(14)
         }
         .background(ThemeColors.cardBackground)
         .border(ThemeColors.cardBorder, width: 1)
         .cornerRadius(12)
     }
     
-    func monthYearTitle(month: Int, year: Int) -> String {
+    func getMonthName(month: Int) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "MMM yyyy"
-
-        let date = Calendar.current.date(
-            from: DateComponents(year: year, month: month)
-        )!
-
+        formatter.dateFormat = "MMM"
+        let date = Calendar.current.date(from: DateComponents(year: 2024, month: month, day: 1))!
         return formatter.string(from: date)
     }
 }
