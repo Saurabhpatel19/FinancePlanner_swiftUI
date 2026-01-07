@@ -71,73 +71,87 @@ struct YearlyExpenseView: View {
 
     // MARK: - Body
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 16) {
-
-                // Title
-                Text("Yearly Expenses")
-                    .font(.title2.bold())
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal)
-
-                // Year chips
-                yearChips
-
-                if isCurrentYear {
-                    yearlyProgressSection
-                } else {
-                    PurpleGradientCard {
-                        Text("Total Planned Expense : \(Int(plannedTotal))")
-                            .foregroundColor(.white)
+        ZStack {
+            ThemeColors.background
+                .ignoresSafeArea()
+            
+            NavigationStack {
+                ScrollView {
+                    VStack(spacing: 20) {
+                        
+                        // Header
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Yearly Expenses")
+                                .font(.system(size: 32, weight: .bold, design: .default))
+                                .foregroundColor(ThemeColors.textPrimary)
+                            
+                            Text("Plan your annual budget")
+                                .font(.caption)
+                                .foregroundColor(ThemeColors.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 16)
+                        
+                        // Year selector
+                        yearChips
+                        
+                        // Progress/Summary card
+                        if isCurrentYear {
+                            yearlyProgressSection
+                        } else {
+                            yearSummaryCard
+                        }
+                        
+                        // Expense list
+                        yearlyExpenseList
+                    }
+                    .padding(.bottom, 20)
+                }
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            showAddExpense = true
+                        } label: {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(ThemeColors.accent)
+                        }
                     }
                 }
-                
-                // Expense list
-                yearlyExpenseList
-
-                Spacer()
-            }
-            .padding(.top)
-            .onAppear {
-                if !availableYears.contains(selectedYear) {
-                    selectedYear = availableYears.first!
+                .sheet(isPresented: $showAddExpense) {
+                    AddEditExpenseView(
+                        expense: ExpenseModel(
+                            name: "",
+                            amount: 0,
+                            type: .fixed,
+                            frequency: .yearly,
+                            month: 1,
+                            year: selectedYear
+                        ),
+                        actionType: .add,
+                        context: context
+                    )
                 }
-            }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showAddExpense = true
-                    } label: {
-                        Image(systemName: "plus")
+                .sheet(item: $editingExpense) { expense in
+                    AddEditExpenseView(
+                        expense: expense,
+                        actionType: .update,
+                        context: context
+                    )
+                }
+                .sheet(item: $showingPaymentSheet) { expense in
+                    PaymentDetailsSheet(
+                        expense: expense,
+                        context: context
+                    )
+                }
+                .onAppear {
+                    if !availableYears.contains(selectedYear) {
+                        selectedYear = availableYears.first!
                     }
                 }
-            }
-            .sheet(isPresented: $showAddExpense) {
-                AddEditExpenseView(
-                    expense: ExpenseModel(
-                        name: "",
-                        amount: 0,
-                        type: .fixed,
-                        frequency: .yearly,
-                        month: 1,
-                        year: selectedYear
-                    ),
-                    actionType: .add,
-                    context: context
-                )
-            }
-            .sheet(item: $editingExpense) { expense in
-                AddEditExpenseView(
-                    expense: expense,
-                    actionType: .update,
-                    context: context
-                )
-            }
-            .sheet(item: $showingPaymentSheet) { expense in
-                PaymentDetailsSheet(
-                    expense: expense,
-                    context: context
-                )
             }
         }
     }
@@ -149,34 +163,44 @@ private extension YearlyExpenseView {
 
     var yearChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 ForEach(availableYears, id: \.self) { year in
-                    yearChip(year)
+                    Text(String(year))
+                        .font(.system(size: 14, weight: .semibold, design: .default))
+                        .frame(minWidth: 60)
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 12)
+                        .background(
+                            selectedYear == year ?
+                            ThemeGradients.accentGradient :
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    ThemeColors.cardBackground,
+                                    ThemeColors.cardBackground.opacity(0.8)
+                                ]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .foregroundColor(selectedYear == year ? .white : ThemeColors.textPrimary)
+                        .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(
+                                    selectedYear == year ? ThemeColors.accentPurple : ThemeColors.cardBorder,
+                                    lineWidth: 1
+                                )
+                        )
+                        .onTapGesture {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectedYear = year
+                            }
+                        }
                 }
             }
-            .padding(.horizontal)
-        }
-    }
-
-    func yearChip(_ year: Int) -> some View {
-        Text(String(year)) // prevents "2,025"
-            .font(.subheadline.weight(.medium))
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 20)
             .padding(.vertical, 8)
-            .background(
-                Capsule()
-                    .fill(selectedYear == year
-                          ? Color.darkPurple
-                          : Color(.systemGray5))
-            )
-            .foregroundColor(
-                selectedYear == year ? .white : .primary
-            )
-            .onTapGesture {
-                withAnimation(.easeInOut) {
-                    selectedYear = year
-                }
-            }
+        }
     }
 }
 
@@ -184,90 +208,151 @@ private extension YearlyExpenseView {
 private extension YearlyExpenseView {
     
     var yearlyExpenseList: some View {
-        ScrollView {
-            LazyVStack(spacing: 12) {
-                ForEach(yearlyExpenses) { expense in
-                    ExpenseCard(
-                        expense: expense,
-                        selectedYear: selectedYear
-                    ) {
-                        expense.togglePaid(
-                            forMonth: expense.month,
-                            year: expense.year
-                        )
-                        
-                        if expense.isPaid {
-                            showingPaymentSheet = expense
+        VStack(alignment: .leading, spacing: 12) {
+            
+            Text("Expenses")
+                .font(.system(size: 14, weight: .semibold, design: .default))
+                .foregroundColor(ThemeColors.textSecondary)
+                .textCase(.uppercase)
+                .tracking(0.5)
+                .padding(.horizontal, 20)
+            
+            if yearlyExpenses.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: "tray")
+                        .font(.system(size: 32, weight: .semibold))
+                        .foregroundColor(ThemeColors.accent)
+                    
+                    Text("No expenses for \(selectedYear)")
+                        .font(.system(size: 14, weight: .medium, design: .default))
+                        .foregroundColor(ThemeColors.textPrimary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 40)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 10) {
+                        ForEach(yearlyExpenses) { expense in
+                            ExpenseCard(
+                                expense: expense,
+                                selectedYear: selectedYear
+                            ) {
+                                expense.togglePaid(
+                                    forMonth: expense.month,
+                                    year: expense.year
+                                )
+                                
+                                if expense.isPaid {
+                                    showingPaymentSheet = expense
+                                }
+                            }
+                            .onTapGesture {
+                                editingExpense = expense
+                            }
                         }
                     }
-                    .onTapGesture {
-                        editingExpense = expense
-                    }
+                    .padding(.horizontal, 20)
                 }
             }
-            .padding(.horizontal)
         }
     }
     
-    private var yearlyProgressSection: some View {
-        PurpleGradientCard {
+    var yearSummaryCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Year \(selectedYear)")
+                .font(.system(size: 16, weight: .semibold, design: .default))
+                .foregroundColor(ThemeColors.textPrimary)
             
-            VStack(alignment: .leading, spacing: 12) {
-
-                Text("₹\(Int(plannedTotal)) • \(unpaidCount) unpaid")
-                    .font(.subheadline)
-                    .foregroundColor(.white)
-                
-                
-                ProgressView(
-                    value: spentTotal,
-                    total: plannedTotal == 0 ? 1 : plannedTotal
-                )
-                .progressViewStyle(.linear)
-                .tint(.green)
-                .scaleEffect(x: 1, y: 2.5)
-                .background(Color.white.opacity(0.6))
-                .animation(.easeInOut, value: spentTotal)
-                
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("₹\(Int(spentTotal))")
-                            .font(.caption)
-                            .foregroundColor(.white)
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(Color.green)
-                                .frame(width: 8, height: 8)
-                            
-                            Text("Spent")
-                                .font(.caption)
-                                .foregroundColor(.white)
-                        }
-                    }
-
-                    Spacer()
-
-                    // Planned (Trailing)
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("₹\(Int(plannedTotal))")
-                            .font(.caption)
-                            .foregroundColor(.white)
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(Color.white.opacity(0.6))
-                                .frame(width: 8, height: 8)
-                            
-                            Text("Planned")
-                                .font(.caption)
-                                .foregroundColor(.white)
-                        }
-                    }
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Total Planned")
+                        .font(.caption2)
+                        .foregroundColor(ThemeColors.textSecondary)
+                    
+                    Text("₹\(Int(plannedTotal))")
+                        .font(.system(size: 18, weight: .bold, design: .default))
+                        .foregroundColor(ThemeColors.textPrimary)
                 }
-                .frame(maxWidth: .infinity)
-
+                
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("Expenses")
+                        .font(.caption2)
+                        .foregroundColor(ThemeColors.textSecondary)
+                    
+                    Text("\(yearlyExpenses.count)")
+                        .font(.system(size: 18, weight: .bold, design: .default))
+                        .foregroundColor(ThemeColors.textPrimary)
+                }
             }
         }
-        .padding(.horizontal)
+        .padding(16)
+        .background(ThemeColors.cardBackground)
+        .border(ThemeColors.cardBorder, width: 1)
+        .cornerRadius(12)
+        .padding(.horizontal, 20)
+    }
+    
+    private var yearlyProgressSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Year \(selectedYear) Progress")
+                    .font(.system(size: 16, weight: .semibold, design: .default))
+                    .foregroundColor(ThemeColors.textPrimary)
+                
+                Text("₹\(Int(plannedTotal)) planned • \(unpaidCount) unpaid")
+                    .font(.caption)
+                    .foregroundColor(ThemeColors.textSecondary)
+            }
+            
+            VStack(spacing: 8) {
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(ThemeColors.cardBorder)
+                    
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(ThemeGradients.positiveGradient)
+                        .frame(width: plannedTotal == 0 ? 0 : CGFloat(spentTotal / plannedTotal) * UIScreen.main.bounds.width * 0.7)
+                }
+                .frame(height: 8)
+                
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Spent")
+                            .font(.caption2)
+                            .foregroundColor(ThemeColors.textSecondary)
+                        
+                        HStack(spacing: 4) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(ThemeColors.positive)
+                            
+                            Text("₹\(Int(spentTotal))")
+                                .font(.system(size: 13, weight: .semibold, design: .default))
+                                .foregroundColor(ThemeColors.textPrimary)
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("Remaining")
+                            .font(.caption2)
+                            .foregroundColor(ThemeColors.textSecondary)
+                        
+                        Text("₹\(Int(max(0, plannedTotal - spentTotal)))")
+                            .font(.system(size: 13, weight: .semibold, design: .default))
+                            .foregroundColor(ThemeColors.textPrimary)
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(ThemeColors.cardBackground)
+        .border(ThemeColors.cardBorder, width: 1)
+        .cornerRadius(12)
+        .padding(.horizontal, 20)
     }
     
     var isCurrentYear: Bool {

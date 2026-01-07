@@ -15,49 +15,123 @@ struct ExpenseCard: View {
     let onTogglePaid: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
+        VStack(spacing: 0) {
+            // Main row
+            HStack(spacing: 12) {
 
-            if isCurrentMonth || selectedYear != nil {
-                Button(action: onTogglePaid) {
-                    Image(systemName: expense.isPaid
-                          ? "checkmark.circle.fill"
-                          : "circle")
-                        .font(.title3)
-                        .foregroundColor(
-                            expense.isPaid ? .green : .secondary
-                        )
+                if isCurrentMonth || selectedYear != nil {
+                    Button(action: onTogglePaid) {
+                        Image(systemName: expense.isPaid
+                              ? "checkmark.circle.fill"
+                              : "circle")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(
+                                expense.isPaid ? ThemeColors.positive : ThemeColors.textSecondary
+                            )
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
-                .scaleEffect(1.4)
-            }
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(expense.name)
-                    .font(.headline)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(expense.name)
+                        .font(.system(size: 15, weight: .semibold, design: .default))
+                        .foregroundColor(ThemeColors.textPrimary)
 
-                if let dueDay = expense.dueDay {
-                    let monthYearTitle = monthYearTitle(month: expense.month, year: expense.year)
-                    Text("Due: \(dueDay) \(monthYearTitle)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    HStack(spacing: 8) {
+                        // Frequency badge
+                        Text(expense.frequency.displayTitle)
+                            .font(.caption2)
+                            .foregroundColor(ThemeColors.accent)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(ThemeColors.accent.opacity(0.1))
+                            .cornerRadius(4)
+                        
+                        // Type badge
+                        Text(expense.type.displayTitle)
+                            .font(.caption2)
+                            .foregroundColor(ThemeColors.accentPurple)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(ThemeColors.accentPurple.opacity(0.1))
+                            .cornerRadius(4)
+                        
+                        Spacer()
+                    }
+                }
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("₹\(Int(expense.amount))")
+                        .font(.system(size: 16, weight: .bold, design: .default))
+                        .foregroundColor(ThemeColors.textPrimary)
+                    
+                    if expense.isPaid {
+                        Text("Paid")
+                            .font(.caption2)
+                            .foregroundColor(ThemeColors.positive)
+                    }
                 }
             }
-
-            Spacer()
-
-            Text("₹\(Int(expense.amount))")
-                .font(.headline)
+            .padding(14)
+            
+            // Details row
+            VStack(spacing: 12) {
+                Divider()
+                    .background(ThemeColors.cardBorder)
+                
+                HStack(spacing: 16) {
+                    // Due day
+                    if let dueDay = expense.dueDay {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Due Day")
+                                .font(.caption2)
+                                .foregroundColor(ThemeColors.textSecondary)
+                            
+                            Text("\(dueDay)")
+                                .font(.system(size: 14, weight: .semibold, design: .default))
+                                .foregroundColor(ThemeColors.textPrimary)
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    // Month/Year
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("Date")
+                            .font(.caption2)
+                            .foregroundColor(ThemeColors.textSecondary)
+                        
+                        Text(monthYearTitle(month: expense.month, year: expense.year))
+                            .font(.system(size: 14, weight: .semibold, design: .default))
+                            .foregroundColor(ThemeColors.textPrimary)
+                    }
+                }
+                .padding(0)
+                
+                Divider()
+                    .background(ThemeColors.cardBorder)
+                
+                // Notes
+                if let note = expense.note, !note.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Notes")
+                            .font(.caption2)
+                            .foregroundColor(ThemeColors.textSecondary)
+                        
+                        Text(note)
+                            .font(.caption)
+                            .foregroundColor(ThemeColors.textSecondary)
+                            .lineLimit(2)
+                    }
+                }
+            }
+            .padding(14)
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(.white))
-        )
-        .shadow(
-            color: Color.black.opacity(0.2),
-            radius: 8,
-            y: 4
-        )
+        .background(ThemeColors.cardBackground)
+        .border(ThemeColors.cardBorder, width: 1)
+        .cornerRadius(12)
     }
     
     func monthYearTitle(month: Int, year: Int) -> String {
