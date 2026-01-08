@@ -15,7 +15,8 @@ struct ThemeColors {
     static let textPrimary = Color(UIColor.label)
     static let textSecondary = Color(UIColor.secondaryLabel)
     static let textTertiary = Color(UIColor.tertiaryLabel)
-    
+    static let textWhite = Color(UIColor.white)
+
     // Accent colors
     static let positive = Color(red: 0.2, green: 0.8, blue: 0.4)
     static let negative = Color(red: 0.95, green: 0.3, blue: 0.2)

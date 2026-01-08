@@ -111,7 +111,7 @@ struct AllExpensesView: View {
                 let isExpanded = expandedYears.contains(section.year)
                 
                 HStack(spacing: 16) {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 8) {
                             Text(String(section.year))
                                 .font(.system(size: 18, weight: .bold, design: .default))
@@ -119,22 +119,16 @@ struct AllExpensesView: View {
                             
                             Text("\(section.items.count) items")
                                 .font(.caption)
-                                .foregroundColor(ThemeColors.textSecondary)
+                                .foregroundColor(ThemeColors.textPrimary)
                         }
                         
-                        HStack(spacing: 12) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Total")
-                                    .font(.caption2)
-                                    .foregroundColor(ThemeColors.textSecondary)
-                                
-                                Text("₹\(Int(total))")
-                                    .font(.system(size: 16, weight: .semibold, design: .default))
-                                    .foregroundColor(ThemeColors.positive)
-                            }
-                            
-                            Spacer()
-                        }
+                        Text("₹\(Int(total))")
+                            .font(.subheadline)
+                            .foregroundColor(ThemeColors.textWhite)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(ThemeColors.accentPurple)
+                            .cornerRadius(4)
                     }
                     
                     Spacer()
@@ -146,7 +140,7 @@ struct AllExpensesView: View {
                             .frame(width: 24, height: 24)
                     }
                 }
-                .padding(16)
+                .padding(12)
             }
             .buttonStyle(.plain)
             .background(
@@ -168,9 +162,11 @@ struct AllExpensesView: View {
                 VStack(spacing: 12) {
                     ForEach(section.items) { summary in
                         seriesExpenseItem(summary)
+                            .shadow(color: Color.black.opacity(0.08), radius: 12, x: 1, y: 3)
+
                     }
                 }
-                .padding(16)
+                .padding(12)
             }
         }
         .background(ThemeColors.cardBackground)
@@ -181,14 +177,14 @@ struct AllExpensesView: View {
     
     func seriesExpenseItem(_ summary: SeriesExpenseSummary) -> some View {
         VStack(spacing: 0) {
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(summary.name)
-                        .font(.system(size: 14, weight: .semibold, design: .default))
-                        .foregroundColor(ThemeColors.textPrimary)
                     
-                    HStack(spacing: 8) {
-                        // Frequency badge
+                    HStack(spacing: 4) {
+                        Text(summary.name)
+                            .font(.system(size: 14, weight: .semibold, design: .default))
+                            .foregroundColor(ThemeColors.textPrimary)
+                        
                         Text(summary.frequency.displayTitle)
                             .font(.caption2)
                             .foregroundColor(ThemeColors.accent)
@@ -196,14 +192,17 @@ struct AllExpensesView: View {
                             .padding(.vertical, 3)
                             .background(ThemeColors.accent.opacity(0.1))
                             .cornerRadius(4)
+                    }
+                       
+                    if summary.frequency == .monthly {
                         
-                        if let monthlyAmount = summary.monthlyAmount {
-                            Text("₹\(Int(monthlyAmount))/mo")
-                                .font(.caption2)
-                                .foregroundColor(ThemeColors.textSecondary)
-                        }
+                        let start = monthYearText(month: summary.startMonth!, year: summary.startYear!)
+                        let end = monthYearText(month: summary.endMonth!, year: summary.endYear!)
+                        let str = "\(start) -> \(end)"
                         
-                        Spacer()
+                        Text(str)
+                            .font(.system(size: 12, weight: .regular, design: .default))
+                            .foregroundColor(ThemeColors.textSecondary)
                     }
                 }
                 
@@ -213,6 +212,12 @@ struct AllExpensesView: View {
                     Text("₹\(Int(summary.displayTotal))")
                         .font(.system(size: 15, weight: .bold, design: .default))
                         .foregroundColor(ThemeColors.textPrimary)
+                    
+                    if let monthlyAmount = summary.monthlyAmount {
+                        Text("₹\(Int(monthlyAmount))/mo")
+                            .font(.caption2)
+                            .foregroundColor(ThemeColors.textSecondary)
+                    }
                 }
             }
             .padding(12)
@@ -220,7 +225,18 @@ struct AllExpensesView: View {
             .cornerRadius(8)
         }
     }
-            
+        
+    func monthYearText(month: Int, year: Int) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM yyyy"
+
+        let date = Calendar.current.date(
+            from: DateComponents(year: year, month: month)
+        )!
+
+        return formatter.string(from: date)
+    }
+    
     private var expensesByYear: [(year: Int, items: [ExpenseModel])] {
         let grouped = Dictionary(grouping: expenses) { $0.year }
 
