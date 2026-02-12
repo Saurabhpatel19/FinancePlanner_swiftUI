@@ -140,17 +140,7 @@ struct HomeView: View {
                     .padding(.bottom, 20)
                 }
                 .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            showAddExpense = true
-                        } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 20))
-                                .foregroundColor(ThemeColors.accent)
-                        }
-                    }
-                }
+                // Removed the toolbar add button to avoid duplication
             }
             .sheet(isPresented: $showAddExpense) {
                 AddEditExpenseView(
@@ -180,6 +170,28 @@ struct HomeView: View {
                     expense: expense,
                     context: context
                 )
+            }
+            
+            // Floating Add Button
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Button(action: { showAddExpense = true }) {
+                        ZStack {
+                            Circle()
+                                .fill(ThemeGradients.accentGradient)
+                                .frame(width: 56, height: 56)
+                                .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 6)
+                            Image(systemName: "plus")
+                                .font(.system(size: 22, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, 20)
+                    .padding(.bottom, 24)
+                }
             }
         }
     }

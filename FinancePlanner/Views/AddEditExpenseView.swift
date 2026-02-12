@@ -5,7 +5,6 @@
 //  Created by Saurabh on 25/12/25.
 //
 
-
 import SwiftUI
 import SwiftData
 import Foundation
@@ -40,6 +39,9 @@ struct AddEditExpenseView: View {
     @State private var note: String
     
     @State private var showPaymentDetailsSheet = false
+    
+    @FocusState private var isAmountFocused: Bool
+    @State private var impact = UIImpactFeedbackGenerator(style: .medium)
 
     // MARK: - UI State
     @State private var showApplyScopeDialog = false
@@ -83,29 +85,57 @@ struct AddEditExpenseView: View {
     var body: some View {
         ZStack {
             // White background with trading UI theme
-            ThemeColors.background
-                .ignoresSafeArea()
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    ThemeColors.background,
+                    ThemeColors.background.opacity(0.96)
+                ]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
             
             NavigationStack {
                 VStack(spacing: 16) {
                     
-                    // Header with title and gradient accent
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(actionType == .add ? "New Expense" : "Edit Expense")
-                                    .font(.system(size: 28, weight: .bold, design: .default))
-                                    .foregroundColor(ThemeColors.textPrimary)
-                                
-                                Text(actionType == .add ? "Create and track" : "Update your expense")
-                                    .font(.caption)
-                                    .foregroundColor(ThemeColors.textSecondary)
-                            }
-                            Spacer()
+                    // Header
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(actionType == .add ? "New Expense" : "Edit Expense")
+                                .font(.system(size: 22, weight: .bold, design: .default))
+                                .foregroundColor(ThemeColors.textPrimary)
+                            Text(actionType == .add ? "Create and track" : "Update your expense")
+                                .font(.caption)
+                                .foregroundColor(ThemeColors.textSecondary)
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 20)
+                        Spacer()
+                        Button(action: { dismiss() }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(ThemeColors.textSecondary)
+                                .padding(10)
+                                .background(ThemeColors.cardBackground)
+                                .cornerRadius(8)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(ThemeColors.cardBorder, lineWidth: 1)
+                                )
+                        }
                     }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
+                    
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            ThemeColors.accent.opacity(0.35),
+                            ThemeColors.accentPurple.opacity(0.25)
+                        ]),
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .frame(height: 4)
+                    .cornerRadius(2)
+                    .padding(.horizontal, 20)
                     
                     // Validation Alert
                     if let message = validationMessage {
@@ -128,56 +158,95 @@ struct AddEditExpenseView: View {
                     ScrollView {
                         VStack(spacing: 16) {
                             
-                            // MARK: - Amount Card (Trading-style)
+                            // MARK: - Amount Card
                             VStack(alignment: .leading, spacing: 12) {
-                                Text("Amount")
-                                    .font(.system(size: 13, weight: .semibold, design: .default))
-                                    .foregroundColor(ThemeColors.textSecondary)
-                                    .textCase(.uppercase)
-                                    .tracking(0.5)
-                                
-                                HStack(spacing: 4) {
+                                HStack(spacing: 6) {
+                                    Circle().fill(ThemeColors.accent).frame(width: 6, height: 6)
+                                    Text("Amount")
+                                        .font(.system(size: 13, weight: .semibold, design: .default))
+                                        .foregroundColor(ThemeColors.textSecondary)
+                                        .textCase(.uppercase)
+                                        .tracking(0.5)
+                                }
+
+                                HStack(spacing: 6) {
                                     Text("₹")
                                         .font(.system(size: 32, weight: .semibold, design: .default))
                                         .foregroundColor(ThemeColors.textSecondary)
-                                    
+
                                     TextField("0", text: $amount)
                                         .font(.system(size: 32, weight: .semibold, design: .default))
                                         .foregroundColor(Double(amount) ?? 0 > 0 ? ThemeColors.positive : ThemeColors.textSecondary)
                                         .keyboardType(.decimalPad)
+                                        .focused($isAmountFocused)
                                         .onChange(of: amount) { _, _ in validationMessage = nil }
-                                    
+                                        .onReceive(NotificationCenter.default.publisher(for: UITextField.textDidChangeNotification)) { _ in
+                                            // keep only digits and one dot
+                                            let filtered = amount.filter { $0.isNumber || $0 == "." }
+                                            let parts = filtered.split(separator: ".", omittingEmptySubsequences: false)
+                                            if parts.count > 2 {
+                                                // more than one dot → keep first two parts
+                                                amount = parts[0] + "." + parts[1]
+                                            } else {
+                                                amount = filtered
+                                            }
+                                        }
+                                        .tint(ThemeColors.accent)
+
                                     Spacer()
                                 }
                                 
-                                // Amount indicator bar
+                                HStack(spacing: 8) {
+                                    ForEach([500, 1000, 2000, 5000], id: \.self) { preset in
+                                        Button(action: { amount = String(preset) }) {
+                                            Text("₹\(preset)")
+                                                .font(.caption.weight(.semibold))
+                                                .padding(.horizontal, 10)
+                                                .padding(.vertical, 6)
+                                                .background(ThemeColors.buttonBackground)
+                                                .foregroundColor(ThemeColors.textPrimary)
+                                                .cornerRadius(8)
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 8)
+                                                        .stroke(ThemeColors.buttonBorder, lineWidth: 1)
+                                                )
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+
                                 if let value = Double(amount), value > 0 {
                                     GeometryReader { geo in
                                         ZStack(alignment: .leading) {
-                                            RoundedRectangle(cornerRadius: 4)
-                                                .fill(ThemeColors.textTertiary.opacity(0.15))
-                                            
-                                            RoundedRectangle(cornerRadius: 4)
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .fill(ThemeColors.textTertiary.opacity(0.12))
+                                            RoundedRectangle(cornerRadius: 6)
                                                 .fill(ThemeGradients.positiveGradient)
                                                 .frame(width: min(geo.size.width * CGFloat(min(value / 100000, 1)), geo.size.width))
                                         }
                                     }
-                                    .frame(height: 6)
+                                    .frame(height: 8)
+                                    .transition(.opacity)
                                 }
                             }
                             .padding(16)
                             .background(ThemeColors.cardBackground)
                             .border(ThemeColors.cardBorder, width: 1)
-                            .cornerRadius(12)
+                            .cornerRadius(14)
+                            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
+                            .shadow(color: ThemeColors.accent.opacity(0.06), radius: 14, x: 0, y: 6)
                             .padding(.horizontal, 20)
                             
                             // MARK: - Name Card
                             VStack(alignment: .leading, spacing: 12) {
-                                Text("Description")
-                                    .font(.system(size: 13, weight: .semibold, design: .default))
-                                    .foregroundColor(ThemeColors.textSecondary)
-                                    .textCase(.uppercase)
-                                    .tracking(0.5)
+                                HStack(spacing: 6) {
+                                    Circle().fill(ThemeColors.accent).frame(width: 6, height: 6)
+                                    Text("Description")
+                                        .font(.system(size: 13, weight: .semibold, design: .default))
+                                        .foregroundColor(ThemeColors.textSecondary)
+                                        .textCase(.uppercase)
+                                        .tracking(0.5)
+                                }
                                 
                                 TextField("Expense name", text: $name)
                                     .font(.system(size: 16, weight: .medium, design: .default))
@@ -188,18 +257,21 @@ struct AddEditExpenseView: View {
                             .padding(16)
                             .background(ThemeColors.cardBackground)
                             .border(ThemeColors.cardBorder, width: 1)
-                            .cornerRadius(12)
+                            .cornerRadius(14)
                             .padding(.horizontal, 20)
                             
                             // MARK: - Type & Frequency Grid
                             VStack(spacing: 12) {
                                 // Type Card
                                 VStack(alignment: .leading, spacing: 12) {
-                                    Text("Category Type")
-                                        .font(.system(size: 13, weight: .semibold, design: .default))
-                                        .foregroundColor(ThemeColors.textSecondary)
-                                        .textCase(.uppercase)
-                                        .tracking(0.5)
+                                    HStack(spacing: 6) {
+                                        Circle().fill(ThemeColors.accent).frame(width: 6, height: 6)
+                                        Text("Category Type")
+                                            .font(.system(size: 13, weight: .semibold, design: .default))
+                                            .foregroundColor(ThemeColors.textSecondary)
+                                            .textCase(.uppercase)
+                                            .tracking(0.5)
+                                    }
                                     
                                     HStack(spacing: 8) {
                                         ForEach(ExpenseType.allCases) { t in
@@ -221,9 +293,9 @@ struct AddEditExpenseView: View {
                                                         )
                                                     )
                                                     .foregroundColor(type == t ? .white : ThemeColors.textPrimary)
-                                                    .cornerRadius(8)
+                                                    .cornerRadius(14)
                                                     .overlay(
-                                                        RoundedRectangle(cornerRadius: 8)
+                                                        RoundedRectangle(cornerRadius: 14)
                                                             .stroke(
                                                                 type == t ?
                                                                 ThemeColors.accentPurple :
@@ -238,15 +310,18 @@ struct AddEditExpenseView: View {
                                 .padding(16)
                                 .background(ThemeColors.cardBackground)
                                 .border(ThemeColors.cardBorder, width: 1)
-                                .cornerRadius(12)
+                                .cornerRadius(14)
                                 
                                 // Frequency Card
                                 VStack(alignment: .leading, spacing: 12) {
-                                    Text("Frequency")
-                                        .font(.system(size: 13, weight: .semibold, design: .default))
-                                        .foregroundColor(ThemeColors.textSecondary)
-                                        .textCase(.uppercase)
-                                        .tracking(0.5)
+                                    HStack(spacing: 6) {
+                                        Circle().fill(ThemeColors.accent).frame(width: 6, height: 6)
+                                        Text("Frequency")
+                                            .font(.system(size: 13, weight: .semibold, design: .default))
+                                            .foregroundColor(ThemeColors.textSecondary)
+                                            .textCase(.uppercase)
+                                            .tracking(0.5)
+                                    }
                                     
                                     if actionType == .add {
                                         Picker("Frequency", selection: $frequency) {
@@ -271,17 +346,20 @@ struct AddEditExpenseView: View {
                                 .padding(16)
                                 .background(ThemeColors.cardBackground)
                                 .border(ThemeColors.cardBorder, width: 1)
-                                .cornerRadius(12)
+                                .cornerRadius(14)
                             }
                             .padding(.horizontal, 20)
                             
                             // MARK: - Schedule Section
                             VStack(alignment: .leading, spacing: 12) {
-                                Text("Schedule")
-                                    .font(.system(size: 13, weight: .semibold, design: .default))
-                                    .foregroundColor(ThemeColors.textSecondary)
-                                    .textCase(.uppercase)
-                                    .tracking(0.5)
+                                HStack(spacing: 6) {
+                                    Circle().fill(ThemeColors.accent).frame(width: 6, height: 6)
+                                    Text("Schedule")
+                                        .font(.system(size: 13, weight: .semibold, design: .default))
+                                        .foregroundColor(ThemeColors.textSecondary)
+                                        .textCase(.uppercase)
+                                        .tracking(0.5)
+                                }
                                 
                                 VStack(spacing: 12) {
                                     switch frequency {
@@ -434,17 +512,20 @@ struct AddEditExpenseView: View {
                                 .padding(16)
                                 .background(ThemeColors.cardBackground)
                                 .border(ThemeColors.cardBorder, width: 1)
-                                .cornerRadius(12)
+                                .cornerRadius(14)
                             }
                             .padding(.horizontal, 20)
                             
                             // MARK: - Due Day Card
                             VStack(alignment: .leading, spacing: 12) {
-                                Text("Due / ECS Day")
-                                    .font(.system(size: 13, weight: .semibold, design: .default))
-                                    .foregroundColor(ThemeColors.textSecondary)
-                                    .textCase(.uppercase)
-                                    .tracking(0.5)
+                                HStack(spacing: 6) {
+                                    Circle().fill(ThemeColors.accent).frame(width: 6, height: 6)
+                                    Text("Due / ECS Day")
+                                        .font(.system(size: 13, weight: .semibold, design: .default))
+                                        .foregroundColor(ThemeColors.textSecondary)
+                                        .textCase(.uppercase)
+                                        .tracking(0.5)
+                                }
                                 
                                 Picker("Day", selection: $dueDay) {
                                     Text("None").tag(Int?.none)
@@ -457,16 +538,19 @@ struct AddEditExpenseView: View {
                             .padding(16)
                             .background(ThemeColors.cardBackground)
                             .border(ThemeColors.cardBorder, width: 1)
-                            .cornerRadius(12)
+                            .cornerRadius(14)
                             .padding(.horizontal, 20)
                             
                             // MARK: - Notes Card
                             VStack(alignment: .leading, spacing: 12) {
-                                Text("Notes")
-                                    .font(.system(size: 13, weight: .semibold, design: .default))
-                                    .foregroundColor(ThemeColors.textSecondary)
-                                    .textCase(.uppercase)
-                                    .tracking(0.5)
+                                HStack(spacing: 6) {
+                                    Circle().fill(ThemeColors.accent).frame(width: 6, height: 6)
+                                    Text("Notes")
+                                        .font(.system(size: 13, weight: .semibold, design: .default))
+                                        .foregroundColor(ThemeColors.textSecondary)
+                                        .textCase(.uppercase)
+                                        .tracking(0.5)
+                                }
                                 
                                 TextEditor(text: $note)
                                     .font(.system(size: 14, design: .default))
@@ -480,7 +564,7 @@ struct AddEditExpenseView: View {
                             .padding(16)
                             .background(ThemeColors.cardBackground)
                             .border(ThemeColors.cardBorder, width: 1)
-                            .cornerRadius(12)
+                            .cornerRadius(14)
                             .padding(.horizontal, 20)
                             
                             // MARK: - Payment Status Card (Edit only)
@@ -515,13 +599,13 @@ struct AddEditExpenseView: View {
                                         .foregroundColor(ThemeColors.accent)
                                         .padding(12)
                                         .background(ThemeColors.accent.opacity(0.08))
-                                        .cornerRadius(8)
+                                        .cornerRadius(14)
                                     }
                                 }
                                 .padding(16)
                                 .background(ThemeColors.cardBackground)
                                 .border(ThemeColors.cardBorder, width: 1)
-                                .cornerRadius(12)
+                                .cornerRadius(14)
                                 .padding(.horizontal, 20)
                             }
                             
@@ -537,7 +621,7 @@ struct AddEditExpenseView: View {
                                     .padding(12)
                                     .background(ThemeColors.negative.opacity(0.08))
                                     .foregroundColor(ThemeColors.negative)
-                                    .cornerRadius(8)
+                                    .cornerRadius(14)
                                     .border(ThemeColors.negative.opacity(0.2), width: 1)
                                 }
                                 .padding(.horizontal, 20)
@@ -550,56 +634,74 @@ struct AddEditExpenseView: View {
                         }
                     }
                     
-                    // MARK: - Action Buttons
-                    VStack(spacing: 12) {
-                        HStack(spacing: 12) {
-                            Button("Cancel") {
-                                dismiss()
+// MARK: - Action Buttons
+ZStack {
+    // Floating container with material + shadow
+    HStack {
+        Spacer()
+        VStack {
+            HStack(spacing: 12) {
+                // Cancel as lightweight text
+                Button("Cancel") { dismiss() }
+                    .font(.system(size: 15, weight: .semibold, design: .default))
+                    .foregroundColor(ThemeColors.textSecondary)
+
+                Spacer(minLength: 12)
+
+                // Primary CTA full-width within the container
+                Button(action: {
+                    if validate() {
+                        impact.impactOccurred()
+                        saveUpdateExpense()
+                    }
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark")
+                        Text(actionType == .add ? "Add Expense" : "Save Changes")
+                    }
+                    .font(.system(size: 16, weight: .semibold, design: .default))
+                    .foregroundColor(.white)
+                    .frame(minHeight: 52)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        Group {
+                            if isValid {
+                                ThemeGradients.positiveGradient
+                            } else {
+                                ThemeGradients.positiveGradient.opacity(0.5)
                             }
-                            .font(.system(size: 16, weight: .semibold, design: .default))
-                            .frame(maxWidth: .infinity)
-                            .padding(14)
-                            .background(ThemeColors.buttonBackground)
-                            .foregroundColor(ThemeColors.textSecondary)
-                            .cornerRadius(10)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .stroke(ThemeColors.buttonBorder, lineWidth: 1)
-                            )
-                            
-                            Button(action: {
-                                if validate() {
-                                    saveUpdateExpense()
-                                }
-                            }) {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "checkmark")
-                                    Text("Save")
-                                }
-                                .font(.system(size: 16, weight: .semibold, design: .default))
-                                .frame(maxWidth: .infinity)
-                                .padding(14)
-                                .background(
-                                    isValid ?
-                                    ThemeGradients.positiveGradient :
-                                    LinearGradient(
-                                        gradient: Gradient(colors: [
-                                            ThemeColors.textTertiary.opacity(0.3),
-                                            ThemeColors.textTertiary.opacity(0.2)
-                                        ]),
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .foregroundColor(.white)
-                                .cornerRadius(10)
-                            }
-                            .disabled(!isValid)
+                        }
+                    )
+                    .cornerRadius(14)
+                }
+                .disabled(!isValid)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 14)
+            .background(
+                ZStack {
+                    VisualEffectBlur()
+                    ThemeColors.accentPurple.opacity(0.06)
+                }
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .shadow(color: Color.black.opacity(0.18), radius: 16, x: 0, y: 10)
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 18)
+        Spacer()
+    }
+}
+.ignoresSafeArea(edges: .bottom)
+                }
+                .onAppear {
+                    impact.prepare()
+                    if actionType == .add {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                            isAmountFocused = true
                         }
                     }
-                    .padding(20)
-                    .background(ThemeColors.cardBackground)
-                    .border(ThemeColors.cardBorder, width: 1)
                 }
                 .sheet(isPresented: $showPaymentDetailsSheet) {
                     PaymentDetailsSheet(
@@ -771,6 +873,7 @@ private extension AddEditExpenseView {
     
     // MARK: - Delete
     func deleteExpense() {
+        impact.impactOccurred()
         self.actionType = .delete
         // 🔥 EDIT CASE: ask confirmation if future months are involved
         if expense.frequency == .oneTime {
@@ -795,5 +898,12 @@ private extension AddEditExpenseView {
     }
 }
 
+struct VisualEffectBlur: UIViewRepresentable {
+    var style: UIBlurEffect.Style = .systemMaterial
 
+    func makeUIView(context: Context) -> UIVisualEffectView {
+        UIVisualEffectView(effect: UIBlurEffect(style: style))
+    }
+    func updateUIView(_ uiView: UIVisualEffectView, context: Context) {}
+}
 
