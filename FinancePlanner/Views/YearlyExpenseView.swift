@@ -109,31 +109,6 @@ struct YearlyExpenseView: View {
                     .padding(.bottom, 20)
                 }
                 .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            showAddExpense = true
-                        } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 20))
-                                .foregroundColor(ThemeColors.accent)
-                        }
-                    }
-                }
-                .sheet(isPresented: $showAddExpense) {
-                    AddEditExpenseView(
-                        expense: ExpenseModel(
-                            name: "",
-                            amount: 0,
-                            type: .fixed,
-                            frequency: .yearly,
-                            month: 1,
-                            year: selectedYear
-                        ),
-                        actionType: .add,
-                        context: context
-                    )
-                }
                 .sheet(item: $editingExpense) { expense in
                     AddEditExpenseView(
                         expense: expense,
