@@ -1,615 +1,298 @@
-//
-//  HomeView.swift
-//  FinancePlanner
-//
-//  Created by Saurabh on 01/01/26.
-//
-
-
 import SwiftUI
 import SwiftData
-import Charts
-
 
 struct HomeView: View {
-    
-    private struct MonthItem: Identifiable, Equatable {
-        let id = UUID()
-        let month: Int
-        let year: Int
-    }
-    
-    @Environment(\.modelContext) private var context
-    
     @Query private var expenses: [ExpenseModel]
-    @State private var selectedMonthIndex = 0
-    
-    @State private var showAddExpense = false
-    @State private var editingExpense: ExpenseModel?
-    
-    @State private var showingPaymentSheet: ExpenseModel?
-    
-    // MARK: - Month Data (Dynamic)
-    private var months: [MonthItem] {
-        let calendar = Calendar.current
-        let now = Date()
-        
-        let currentMonth = calendar.component(.month, from: now)
-        let currentYear = calendar.component(.year, from: now)
-        
-        var result: [MonthItem] = []
-        
-        // current year (current month → Dec)
-        for m in currentMonth...12 {
-            result.append(MonthItem(month: m, year: currentYear))
-        }
-        
-        // next year (Jan → Dec)
-        for m in 1...12 {
-            result.append(MonthItem(month: m, year: currentYear + 1))
-        }
-        
-        // optional extra year if late in year
-        if currentMonth >= 10 {
-            for m in 1...12 {
-                result.append(MonthItem(month: m, year: currentYear + 2))
-            }
-        }
-        
-        return result
-    }
-    
-    private var selectedMonth: MonthItem {
-        months[selectedMonthIndex]
-    }
-    
-    // MARK: - Derived Values
-    private var monthExpenses: [ExpenseModel] {
-        expenses.filter {
-            $0.month == selectedMonth.month &&
-            $0.year == selectedMonth.year
-        }
-    }
-    
-    private var plannedTotal: Double {
-        monthExpenses.reduce(0) { $0 + $1.amount }
-    }
-    
-    private var spentTotal: Double {
-        monthExpenses
-            .filter { $0.isPaid }
-            .reduce(0) { $0 + $1.amount }
-    }
-    
-    private var unpaidCount: Int {
-        monthExpenses.filter { !$0.isPaid }.count
-    }
-    
-    private var fixedTotal: Double {
-        monthExpenses
-            .filter { $0.type == .fixed }
-            .reduce(0) { $0 + $1.amount }
-    }
-    
-    private var variableTotal: Double {
-        monthExpenses
-            .filter { $0.type == .variable }
-            .reduce(0) { $0 + $1.amount }
-    }
-    
-    // MARK: - UI
-    var body: some View {
-        ZStack {
-            ThemeColors.background
-                .ignoresSafeArea()
-            
-            NavigationStack {
-                ScrollView {
-                    VStack(spacing: 20) {
-                        
-                        // Header with title and add button
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("My Finance")
-                                .font(.system(size: 32, weight: .bold, design: .default))
-                                .foregroundColor(ThemeColors.textPrimary)
-                            
-                            Text("Track your monthly expenses")
-                                .font(.caption)
-                                .foregroundColor(ThemeColors.textSecondary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 20)
-                        .padding(.top, 16)
-                        
-                        // Month selector
-                        monthChips
-                        
-                        if monthExpenses.isEmpty {
-                            emptyState
-                        } else {
-                            // Monthly progress card
-                            monthlyProgressSection
-                            
-                            // Fixed vs Variable breakdown
-                            breakdownCard
-                            
-                            // Expense list
-                            expenseList
-                        }
-                    }
-                    .padding(.bottom, 20)
-                }
-                .navigationBarTitleDisplayMode(.inline)
-                // Removed the toolbar add button to avoid duplication
-            }
-            .sheet(isPresented: $showAddExpense) {
-                AddEditExpenseView(
-                    expense: ExpenseModel(
-                        name: "",
-                        amount: 0,
-                        type: .fixed,
-                        frequency: .monthly,
-                        month: selectedMonth.month,
-                        year: selectedMonth.year
-                    ),
-                    actionType: .add,
-                    context: context
-                )
-            }
-            
-            .sheet(item: $editingExpense) { expense in
-                AddEditExpenseView(
-                    expense: expense,
-                    actionType: .update,
-                    context: context
-                )
-            }
-            
-            .sheet(item: $showingPaymentSheet) { expense in
-                PaymentDetailsSheet(
-                    expense: expense,
-                    context: context
-                )
-            }
-        }
-    }
-    //MARK: - Month Chips
-    var monthChips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(months.indices, id: \.self) { index in
-                    let month = months[index]
-                    
-                    VStack(spacing: 2) {
-                        Text(shortMonthTitle(month: month.month, year: month.year))
-                            .font(.system(size: 12, weight: .semibold, design: .default))
-                    }
-                    .frame(minWidth: 54)
-                    .padding(.vertical, 10)
-                    .padding(.horizontal, 12)
-                    .background(
-                        selectedMonthIndex == index ?
-                        ThemeGradients.accentGradient :
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                ThemeColors.cardBackground,
-                                ThemeColors.cardBackground.opacity(0.8)
-                            ]),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .foregroundColor(selectedMonthIndex == index ? .white : ThemeColors.textPrimary)
-                    .cornerRadius(10)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(
-                                selectedMonthIndex == index ? ThemeColors.accentPurple : ThemeColors.cardBorder,
-                                lineWidth: 1
-                            )
-                    )
-                    .onTapGesture {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            selectedMonthIndex = index
-                        }
-                    }
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 8)
-        }
-    }
-    
-    var monthSummary: some View {
-        VStack(spacing: 6) {
-            Text(fullMonthTitle(month: selectedMonth.month, year: selectedMonth.year))
-                .font(.title2.weight(.semibold))
-            
-            if isCurrentMonth {
-                Text("₹\(Int(plannedTotal)) • \(unpaidCount) unpaid")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            } else {
-                Text("Expected Expense ₹\(Int(plannedTotal))")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-        }
-    }
-    
-    var emptyState: some View {
-        VStack(spacing: 16) {
-            Spacer()
-                .frame(height: 40)
-            
-            ZStack {
-                Circle()
-                    .fill(ThemeColors.accent.opacity(0.1))
-                    .frame(width: 80, height: 80)
-                
-                Image(systemName: "tray")
-                    .font(.system(size: 32, weight: .semibold))
-                    .foregroundColor(ThemeColors.accent)
-            }
-            
-            VStack(spacing: 4) {
-                Text("No expenses yet")
-                    .font(.system(size: 16, weight: .semibold, design: .default))
-                    .foregroundColor(ThemeColors.textPrimary)
-                
-                Text("Add your first expense to get started")
-                    .font(.caption)
-                    .foregroundColor(ThemeColors.textSecondary)
-            }
-            
-            Spacer()
-                .frame(height: 40)
-        }
-        .frame(maxWidth: .infinity)
-    }
-    
-    var monthlyProgressSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            // Header
-            VStack(alignment: .leading, spacing: 4) {
-                Text(fullMonthTitle(month: selectedMonth.month, year: selectedMonth.year))
-                    .font(.system(size: 18, weight: .semibold, design: .default))
-                    .foregroundColor(ThemeColors.textPrimary)
-                
-                if isCurrentMonth {
-                    Text("₹\(Int(plannedTotal)) planned • \(unpaidCount) unpaid")
-                        .font(.caption)
-                        .foregroundColor(ThemeColors.textSecondary)
-                } else {
-                    Text("Expected expense: ₹\(Int(plannedTotal))")
-                        .font(.caption)
-                        .foregroundColor(ThemeColors.textSecondary)
-                }
-            }
-            
-            if isCurrentMonth {
-                // Progress bar
-                VStack(spacing: 8) {
-                    ProgressView(
-                        value: spentTotal,
-                        total: plannedTotal == 0 ? 1 : plannedTotal
-                    )
-                    .progressViewStyle(.linear)
-                    .tint(ThemeGradients.positiveGradient)
-                    .scaleEffect(x: 1, y: 2.5)
-                    .background(Color.white.opacity(0.6))
-                    .animation(.easeInOut, value: spentTotal)
-                    
-                    HStack(spacing: 16) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Spent")
-                                .font(.caption2)
-                                .foregroundColor(ThemeColors.textSecondary)
-                            
-                            HStack(spacing: 4) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.caption)
-                                    .foregroundColor(ThemeColors.positive)
-                                
-                                Text("₹\(Int(spentTotal))")
-                                    .font(.system(size: 13, weight: .semibold, design: .default))
-                                    .foregroundColor(ThemeColors.textPrimary)
-                            }
-                        }
-                        
-                        Spacer()
-                        
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text("Remaining")
-                                .font(.caption2)
-                                .foregroundColor(ThemeColors.textSecondary)
-                            
-                            Text("₹\(Int(max(0, plannedTotal - spentTotal)))")
-                                .font(.system(size: 13, weight: .semibold, design: .default))
-                                .foregroundColor(ThemeColors.textPrimary)
-                        }
-                    }
-                }
-            } else {
-                // Expected expense card (non-current month)
-                VStack(spacing: 8) {
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(ThemeColors.cardBorder)
-                    }
-                    .frame(height: 0)
-                    .frame(height: 0)
-                }
-            }
-        }
-        .padding(16)
-        .background(ThemeColors.cardBackground)
-        .border(ThemeColors.cardBorder, width: 1)
-        .cornerRadius(12)
-        .padding(.horizontal, 20)
-    }
-    
-    var statsGrid: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 12) {
-                StatCard(
-                    icon: "banknote",
-                    title: "Total Planned",
-                    amount: Int(plannedTotal),
-                    color: .blue
-                )
-                
-                StatCard(
-                    icon: "checkmark.circle",
-                    title: "Spent",
-                    amount: Int(spentTotal),
-                    color: .green
-                )
-            }
-            
-            HStack(spacing: 12) {
-                StatCard(
-                    icon: "square.stack",
-                    title: "Fixed",
-                    amount: Int(fixedTotal),
-                    color: .purple
-                )
-                
-                StatCard(
-                    icon: "chart.bar",
-                    title: "Variable",
-                    amount: Int(variableTotal),
-                    color: .orange
-                )
-            }
-        }
-        .padding(.horizontal, 20)
-    }
-    
-    var breakdownCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Breakdown")
-                .font(.system(size: 14, weight: .semibold, design: .default))
-                .foregroundColor(ThemeColors.textSecondary)
-                .textCase(.uppercase)
-                .tracking(0.5)
-            
-            VStack(spacing: 10) {
-                breakdownItem(title: "Fixed Expenses", amount: Int(fixedTotal), color: ThemeColors.accentPurple)
-                
-                Divider()
-                    .background(ThemeColors.cardBorder)
-                
-                breakdownItem(title: "Variable Expenses", amount: Int(variableTotal), color: ThemeColors.accent)
-            }
-        }
-        .padding(16)
-        .background(ThemeColors.cardBackground)
-        .border(ThemeColors.cardBorder, width: 1)
-        .cornerRadius(12)
-        .padding(.horizontal, 20)
-    }
-    
-    func breakdownItem(title: String, amount: Int, color: Color) -> some View {
-        HStack {
-            Text(title)
-                .font(.system(size: 14, weight: .medium, design: .default))
-                .foregroundColor(ThemeColors.textPrimary)
-            
-            Spacer()
-            
-            HStack(spacing: 4) {
-                Circle()
-                    .fill(color)
-                    .frame(width: 8, height: 8)
-                
-                Text("₹\(amount)")
-                    .font(.system(size: 14, weight: .semibold, design: .default))
-                    .foregroundColor(ThemeColors.textPrimary)
-            }
-        }
-    }
-    
-    var monthlySummaryView: some View {
-        EmptyView()
-    }
-    
-    
-    
-    func summaryItem(
-        color: Color,
-        title: String,
-        amount: Double
-    ) -> some View
-    {
-        
-        HStack(alignment: .center,spacing: 6) {
-            
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.primary)
-            
-            Text("₹\(Int(amount))")
-                .font(.caption.weight(.semibold))
-                .foregroundColor(.primary)
-        }
-    }
-    
-    
-    var fixedVariableChart: some View {
-        VStack(spacing: 12) {
-            
-            Chart {
-                if fixedTotal > 0 {
-                    SectorMark(
-                        angle: .value("Fixed", fixedTotal)
-                    )
-                    .foregroundStyle(Color.blue.opacity(0.6))
-                }
-                
-                if variableTotal > 0 {
-                    SectorMark(
-                        angle: .value("Variable", variableTotal)
-                    )
-                    .foregroundStyle(Color.gray.opacity(0.6))
-                }
-            }
-            .frame(height: 160)
-            
-            // 👇 Simple legend with values
-            HStack(spacing: 24) {
-                
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(Color.blue.opacity(0.6))
-                        .frame(width: 10, height: 10)
-                    
-                    Text("Fixed ₹\(Int(fixedTotal))")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(Color.gray.opacity(0.6))
-                        .frame(width: 10, height: 10)
-                    
-                    Text("Variable ₹\(Int(variableTotal))")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-        }
-    }
-    
-    var expenseList: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            
-            Text("Expenses")
-                .font(.system(size: 14, weight: .semibold, design: .default))
-                .foregroundColor(ThemeColors.textSecondary)
-                .textCase(.uppercase)
-                .tracking(0.5)
-                .padding(.horizontal, 20)
-            
-            if monthExpenses.isEmpty {
-                Text("No expenses")
-                    .foregroundColor(ThemeColors.textSecondary)
-                    .padding(.horizontal, 20)
-            } else {
-                LazyVStack(spacing: 10) {
-                    ForEach(monthExpenses) { expense in
-                        ExpenseCard(
-                            expense: expense,
-                            isCurrentMonth: isCurrentMonth
-                        ) {
-                            expense.togglePaid(
-                                forMonth: expense.month,
-                                year: expense.year
-                            )
-                            
-                            if expense.isPaid {
-                                showingPaymentSheet = expense
-                            }
-                        }
-                        .onTapGesture {
-                            editingExpense = expense
-                        }
-                    }
-                }
-                .padding(.horizontal, 20)
-            }
-        }
-    }
-    
-    var isCurrentMonth: Bool {
-        let now = Date()
-        let cal = Calendar.current
-        return selectedMonth.month == cal.component(.month, from: now) &&
-        selectedMonth.year == cal.component(.year, from: now)
-    }
-    
-    func fullMonthTitle(month: Int, year: Int) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMMM yyyy"
-        
-        let date = Calendar.current.date(
-            from: DateComponents(year: year, month: month)
-        )!
-        
-        return formatter.string(from: date)
-    }
-    
-    func shortMonthTitle(month: Int, year: Int) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM yy"
-        
-        let date = Calendar.current.date(
-            from: DateComponents(year: year, month: month)
-        )!
-        
-        return formatter.string(from: date)
-    }
-}
 
-// MARK: - StatCard Component
-struct StatCard: View {
-    let icon: String
-    let title: String
-    let amount: Int
-    let color: Color
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: icon)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(color)
-                
-                Spacer()
+    var onGoToBills: (() -> Void)? = nil
+    var onGoToDaily: (() -> Void)? = nil
+
+    private var now: Date { Date() }
+
+    private var monthKey: (month: Int, year: Int) {
+        let cal = Calendar.current
+        return (cal.component(.month, from: now), cal.component(.year, from: now))
+    }
+
+    private var todayKey: (day: Int, month: Int, year: Int) {
+        let cal = Calendar.current
+        return (
+            cal.component(.day, from: now),
+            cal.component(.month, from: now),
+            cal.component(.year, from: now)
+        )
+    }
+
+    private var todayDaily: [ExpenseModel] {
+        expenses
+            .filter {
+                $0.frequency == .daily &&
+                $0.day == todayKey.day &&
+                $0.month == todayKey.month &&
+                $0.year == todayKey.year
             }
-            
+            .sorted { $0.name < $1.name }
+    }
+
+    private var monthlyBills: [ExpenseModel] {
+        expenses
+            .filter {
+                $0.frequency != .daily &&
+                $0.month == monthKey.month &&
+                $0.year == monthKey.year
+            }
+            .sorted { $0.name < $1.name }
+    }
+
+    private var totalDaily: Double { todayDaily.reduce(0) { $0 + $1.amount } }
+    private var totalMonthly: Double { monthlyBills.reduce(0) { $0 + $1.amount } }
+    private var paidMonthly: Double { monthlyBills.filter(\.isPaid).reduce(0) { $0 + $1.amount } }
+    private var unpaidMonthly: [ExpenseModel] { monthlyBills.filter { !$0.isPaid } }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                header
+                content
+            }
+            .padding(.bottom, 110)
+        }
+        .background(JColor.bg)
+        .ignoresSafeArea(.container, edges: .top)
+    }
+
+    private var header: some View {
+        VStack(spacing: 20) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Good morning")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundColor(JColor.sub)
+                    Text(ThemeStore.shared.userName.isEmpty ? "Saurabh" : ThemeStore.shared.userName)
+                        .font(.system(size: 28, weight: .black, design: .rounded))
+                        .foregroundColor(JColor.text)
+                    Text(formattedDate(now))
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundColor(JColor.sub)
+                }
+                Spacer()
+                Circle()
+                    .fill(JColor.primarySoft)
+                    .frame(width: 46, height: 46)
+                    .overlay(Text("👤").font(.system(size: 20)))
+            }
+
+            HStack(spacing: 12) {
+                metricCard(title: "TODAY SPENT", value: totalDaily, tint: JColor.daily, bg: JColor.dailySoft, subtitle: "\(todayKey.day) \(shortMonth(todayKey.month)) \(todayKey.year)")
+                metricCard(title: "MONTHLY BILLS", value: totalMonthly, tint: JColor.primary, bg: JColor.primarySoft, subtitle: unpaidMonthly.isEmpty ? "All paid" : "\(unpaidMonthly.count) unpaid")
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 52)
+        .padding(.bottom, 20)
+        .background(Color.white)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(JColor.border).frame(height: 1)
+        }
+    }
+
+    private func metricCard(title: String, value: Double, tint: Color, bg: Color, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.system(size: 12, weight: .medium, design: .default))
-                .foregroundColor(ThemeColors.textSecondary)
-            
-            Text("₹\(amount)")
-                .font(.system(size: 18, weight: .bold, design: .default))
-                .foregroundColor(ThemeColors.textPrimary)
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundColor(tint)
+            Text("₹\(Int(value).formatted(.number.grouping(.automatic)))")
+                .font(.system(size: 22, weight: .black, design: .rounded))
+                .foregroundColor(JColor.text)
+            Text(subtitle)
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundColor(JColor.sub)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    color.opacity(0.08),
-                    color.opacity(0.04)
-                ]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+        .padding(16)
+        .background(bg)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(tint.opacity(0.2), lineWidth: 1.2)
         )
-        .border(color.opacity(0.2), width: 1)
-        .cornerRadius(10)
+    }
+
+    private var content: some View {
+        VStack(spacing: 16) {
+            monthlyProgressCard
+
+            sectionHeader("⏰ Upcoming Dues", action: { onGoToBills?() })
+            VStack(spacing: 8) {
+                ForEach(unpaidMonthly.prefix(3)) { bill in
+                    upcomingRow(bill)
+                }
+            }
+
+            sectionHeader("Today's Spending", action: { onGoToDaily?() })
+            VStack(spacing: 8) {
+                ForEach(todayDaily.prefix(4)) { item in
+                    dailyRow(item)
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 16)
+    }
+
+    private var monthlyProgressCard: some View {
+        JCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(monthTitle(monthKey.month)) \(monthKey.year)")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundColor(JColor.sub)
+                        Text("₹\(Int(paidMonthly).formatted(.number.grouping(.automatic))) / ₹\(Int(max(totalMonthly, 0)).formatted(.number.grouping(.automatic)))")
+                            .font(.system(size: 20, weight: .black, design: .rounded))
+                            .foregroundColor(JColor.text)
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 4) {
+                        JTag(label: unpaidMonthly.isEmpty ? "All paid" : "\(unpaidMonthly.count) unpaid", fg: unpaidMonthly.isEmpty ? JColor.paid : JColor.overdue, bg: unpaidMonthly.isEmpty ? JColor.paidSoft : JColor.overdueSoft)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(JColor.sub)
+                    }
+                }
+
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(JColor.border)
+                        Capsule()
+                            .fill(LinearGradient(colors: [JColor.paid, JColor.paid.opacity(0.75)], startPoint: .leading, endPoint: .trailing))
+                            .frame(width: geo.size.width * CGFloat(totalMonthly == 0 ? 0 : min(1, paidMonthly / totalMonthly)))
+                    }
+                }
+                .frame(height: 8)
+
+                HStack {
+                    Text("✓ ₹\(Int(paidMonthly).formatted(.number.grouping(.automatic))) paid")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundColor(JColor.paid)
+                    Spacer()
+                    Text("₹\(Int(max(0, totalMonthly - paidMonthly)).formatted(.number.grouping(.automatic))) remaining")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundColor(JColor.sub)
+                }
+            }
+            .padding(18)
+        }
+        .onTapGesture { onGoToBills?() }
+    }
+
+    private func sectionHeader(_ title: String, action: @escaping () -> Void) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 13, weight: .black, design: .rounded))
+                .foregroundColor(JColor.text)
+            Spacer()
+            Button(action: action) {
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 28, height: 28)
+                    .overlay(
+                        Circle().stroke(JColor.border, lineWidth: 1.2)
+                    )
+                    .overlay(Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold)).foregroundColor(JColor.sub))
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func upcomingRow(_ bill: ExpenseModel) -> some View {
+        JCard {
+            HStack(spacing: 12) {
+                Rectangle()
+                    .fill(JColor.overdue)
+                    .frame(width: 4)
+                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(bill.name)
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundColor(JColor.text)
+                    Text("Due: \(bill.dueDay ?? 1) \(shortMonth(monthKey.month))")
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundColor(JColor.sub)
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("₹\(Int(bill.amount).formatted(.number.grouping(.automatic)))")
+                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .foregroundColor(JColor.text)
+                    JTag(label: "Upcoming", fg: JColor.upcoming, bg: JColor.upcomingSoft)
+                }
+            }
+            .padding(14)
+        }
+    }
+
+    private func dailyRow(_ item: ExpenseModel) -> some View {
+        JCard {
+            HStack(spacing: 12) {
+                Circle()
+                    .fill((colorForCategory(item.category ?? .other)).opacity(0.2))
+                    .frame(width: 42, height: 42)
+                    .overlay(Text(emojiForCategory(item.category ?? .other)).font(.system(size: 18)))
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(item.name)
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundColor(JColor.text)
+                    Text((item.category ?? .other).displayTitle)
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundColor(JColor.sub)
+                }
+                Spacer()
+                Text("-₹\(Int(item.amount))")
+                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .foregroundColor(JColor.overdue)
+            }
+            .padding(12)
+        }
+    }
+
+    private func shortMonth(_ m: Int) -> String {
+        DateFormatter().shortMonthSymbols[m - 1]
+    }
+
+    private func monthTitle(_ m: Int) -> String {
+        DateFormatter().monthSymbols[m - 1].uppercased()
+    }
+
+    private func formattedDate(_ date: Date) -> String {
+        let fmt = DateFormatter()
+        fmt.dateStyle = .full
+        return fmt.string(from: date)
+    }
+
+    private func colorForCategory(_ c: ExpenseCategory) -> Color {
+        switch c {
+        case .groceries: return .red
+        case .transport: return .blue
+        case .shopping: return .orange
+        case .health: return .green
+        case .utilities, .subscriptions, .insurance, .emi: return JColor.primary
+        case .entertainment: return .purple
+        default: return .gray
+        }
+    }
+
+    private func emojiForCategory(_ c: ExpenseCategory) -> String {
+        switch c {
+        case .groceries: return "🍔"
+        case .transport: return "🚗"
+        case .shopping: return "🛍️"
+        case .health: return "💊"
+        case .utilities, .subscriptions, .insurance, .emi: return "📄"
+        case .entertainment: return "🎮"
+        default: return "📦"
+        }
     }
 }

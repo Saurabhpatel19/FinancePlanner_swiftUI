@@ -6,6 +6,7 @@
 //
 
 enum ExpenseFrequency: String, Codable, CaseIterable, Identifiable {
+     case daily
      case oneTime
      case monthly
      case yearly
@@ -15,6 +16,8 @@ enum ExpenseFrequency: String, Codable, CaseIterable, Identifiable {
      // Display text for UI
      var displayTitle: String {
          switch self {
+         case .daily:
+             return "Daily"
          case .oneTime:
              return "Once"
          case .monthly:

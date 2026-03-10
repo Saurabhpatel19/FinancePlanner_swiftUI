@@ -1,763 +1,534 @@
-//
-//  AddEditExpenseView.swift
-//  FinancePlanner
-//
-//  Created by Saurabh on 25/12/25.
-//
-
 import SwiftUI
 import SwiftData
 import Foundation
 
 struct AddEditExpenseView: View {
-
-    // MARK: - Environment
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
 
-    // MARK: - Inputs
     let expense: ExpenseModel
     private let dataService: FinanceDataService
 
-    // MARK: - Editable State
     @State private var name: String
     @State private var amount: String
     @State private var type: ExpenseType
+    @State private var category: ExpenseCategory
     @State private var frequency: ExpenseFrequency
     @State private var actionType: ExpenseActionType
 
-    @State private var month: Int          // oneTime only
+    @State private var month: Int
     @State private var year: Int
-
     @State private var startMonth: Int
     @State private var startYear: Int
-    
     @State private var endMonth: Int
     @State private var endYear: Int
-    
+    @State private var dailyDate: Date
+
     @State private var dueDay: Int?
     @State private var note: String
-    
+
     @State private var showPaymentDetailsSheet = false
-    
     @FocusState private var isAmountFocused: Bool
     @State private var impact = UIImpactFeedbackGenerator(style: .medium)
 
-    // MARK: - UI State
     @State private var showApplyScopeDialog = false
-    
-    //MARK: -Validation
-    @State private var validationMessage: String? = nil
+    @State private var validationMessage: String?
 
-    // MARK: - Init
-    init(
-        expense: ExpenseModel,
-        actionType: ExpenseActionType,
-        context: ModelContext
-    )
-    {
+    init(expense: ExpenseModel, actionType: ExpenseActionType, context: ModelContext) {
         self.expense = expense
         self.actionType = actionType
         self.dataService = FinanceDataService(context: context)
 
         _name = State(initialValue: expense.name)
-        _amount = State(
-            initialValue: expense.amount == 0 ? "" : String(Int(expense.amount))
-        )
+        _amount = State(initialValue: expense.amount == 0 ? "" : String(Int(expense.amount)))
         _type = State(initialValue: expense.type)
+        _category = State(initialValue: expense.category ?? .other)
         _frequency = State(initialValue: expense.frequency)
-                
+
         _month = State(initialValue: expense.month)
-        _year  = State(initialValue: expense.year)
-
+        _year = State(initialValue: expense.year)
         _startMonth = State(initialValue: expense.startMonth ?? expense.month)
-        _startYear  = State(initialValue: expense.startYear  ?? expense.year)
-
+        _startYear = State(initialValue: expense.startYear ?? expense.year)
         _endMonth = State(initialValue: expense.endMonth ?? expense.month)
-        _endYear  = State(initialValue: expense.endYear  ?? expense.year)
+        _endYear = State(initialValue: expense.endYear ?? expense.year)
+
+        let fallbackDate = Calendar.current.date(from: DateComponents(year: expense.year, month: expense.month, day: expense.day ?? 1)) ?? Date()
+        _dailyDate = State(initialValue: fallbackDate)
 
         _dueDay = State(initialValue: expense.dueDay)
-        _note   = State(initialValue: expense.note ?? "")
-
+        _note = State(initialValue: expense.note ?? "")
     }
 
-    // MARK: - Body
     var body: some View {
         ZStack {
-            // White background with trading UI theme
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    ThemeColors.background,
-                    ThemeColors.background.opacity(0.96)
-                ]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-            
+            ThemeColors.backgroundTop
+                .ignoresSafeArea()
+
             NavigationStack {
-                VStack(spacing: 16) {
-                    
-                    // Header
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(actionType == .add ? "New Expense" : "Edit Expense")
-                                .font(.system(size: 22, weight: .bold, design: .default))
-                                .foregroundColor(ThemeColors.textPrimary)
-                            Text(actionType == .add ? "Create and track" : "Update your expense")
-                                .font(.caption)
-                                .foregroundColor(ThemeColors.textSecondary)
-                        }
-                        Spacer()
-                        Button(action: { dismiss() }) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(ThemeColors.textSecondary)
-                                .padding(10)
-                                .background(ThemeColors.cardBackground)
-                                .cornerRadius(8)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(ThemeColors.cardBorder, lineWidth: 1)
-                                )
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 16)
-                    
-                    LinearGradient(
-                        gradient: Gradient(colors: [
-                            ThemeColors.accent.opacity(0.35),
-                            ThemeColors.accentPurple.opacity(0.25)
-                        ]),
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                    .frame(height: 4)
-                    .cornerRadius(2)
-                    .padding(.horizontal, 20)
-                    
-                    // Validation Alert
-                    if let message = validationMessage {
-                        HStack(spacing: 12) {
-                            Image(systemName: "exclamationmark.circle.fill")
-                                .foregroundColor(.orange)
+                ScrollView {
+                    VStack(spacing: 14) {
+                        title
+
+                        if let message = validationMessage {
                             Text(message)
-                                .font(.subheadline)
-                                .foregroundColor(.orange)
-                            Spacer()
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(ThemeColors.negative)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(12)
+                                .background(ThemeColors.negative.opacity(0.09))
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         }
-                        .padding(12)
-                        .background(Color.orange.opacity(0.08))
-                        .cornerRadius(8)
-                        .padding(.horizontal, 20)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                    }
-                    
-                    // Content scroll view
-                    ScrollView {
-                        VStack(spacing: 16) {
-                            
-                            // MARK: - Amount Card
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack(spacing: 6) {
-                                    Circle().fill(ThemeColors.accent).frame(width: 6, height: 6)
-                                    Text("Amount")
-                                        .font(.system(size: 13, weight: .semibold, design: .default))
-                                        .foregroundColor(ThemeColors.textSecondary)
-                                        .textCase(.uppercase)
-                                        .tracking(0.5)
-                                }
 
-                                HStack(spacing: 6) {
-                                    Text("₹")
-                                        .font(.system(size: 32, weight: .semibold, design: .default))
-                                        .foregroundColor(ThemeColors.textSecondary)
+                        amountCard
+                        detailsCard
+                        scheduleCard
+                        noteCard
 
-                                    TextField("0", text: $amount)
-                                        .font(.system(size: 32, weight: .semibold, design: .default))
-                                        .foregroundColor(Double(amount) ?? 0 > 0 ? ThemeColors.positive : ThemeColors.textSecondary)
-                                        .keyboardType(.decimalPad)
-                                        .focused($isAmountFocused)
-                                        .onChange(of: amount) { _, _ in validationMessage = nil }
-                                        .onReceive(NotificationCenter.default.publisher(for: UITextField.textDidChangeNotification)) { _ in
-                                            // keep only digits and one dot
-                                            let filtered = amount.filter { $0.isNumber || $0 == "." }
-                                            let parts = filtered.split(separator: ".", omittingEmptySubsequences: false)
-                                            if parts.count > 2 {
-                                                // more than one dot → keep first two parts
-                                                amount = parts[0] + "." + parts[1]
-                                            } else {
-                                                amount = filtered
-                                            }
-                                        }
-                                        .tint(ThemeColors.accent)
+                        if actionType == .update, expense.isPaid {
+                            paidCard
+                        }
 
-                                    Spacer()
-                                }
-                                
-                                HStack(spacing: 8) {
-                                    ForEach([500, 1000, 2000, 5000], id: \.self) { preset in
-                                        Button(action: { amount = String(preset) }) {
-                                            Text("₹\(preset)")
-                                                .font(.caption.weight(.semibold))
-                                                .padding(.horizontal, 10)
-                                                .padding(.vertical, 6)
-                                                .background(ThemeColors.buttonBackground)
-                                                .foregroundColor(ThemeColors.textPrimary)
-                                                .cornerRadius(8)
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: 8)
-                                                        .stroke(ThemeColors.buttonBorder, lineWidth: 1)
-                                                )
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                }
-
-                                if let value = Double(amount), value > 0 {
-                                    GeometryReader { geo in
-                                        ZStack(alignment: .leading) {
-                                            RoundedRectangle(cornerRadius: 6)
-                                                .fill(ThemeColors.textTertiary.opacity(0.12))
-                                            RoundedRectangle(cornerRadius: 6)
-                                                .fill(ThemeGradients.positiveGradient)
-                                                .frame(width: min(geo.size.width * CGFloat(min(value / 100000, 1)), geo.size.width))
-                                        }
-                                    }
-                                    .frame(height: 8)
-                                    .transition(.opacity)
-                                }
-                            }
-                            .padding(16)
-                            .background(ThemeColors.cardBackground)
-                            .border(ThemeColors.cardBorder, width: 1)
-                            .cornerRadius(14)
-                            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
-                            .shadow(color: ThemeColors.accent.opacity(0.06), radius: 14, x: 0, y: 6)
-                            .padding(.horizontal, 20)
-                            
-                            // MARK: - Name Card
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack(spacing: 6) {
-                                    Circle().fill(ThemeColors.accent).frame(width: 6, height: 6)
-                                    Text("Description")
-                                        .font(.system(size: 13, weight: .semibold, design: .default))
-                                        .foregroundColor(ThemeColors.textSecondary)
-                                        .textCase(.uppercase)
-                                        .tracking(0.5)
-                                }
-                                
-                                TextField("Expense name", text: $name)
-                                    .font(.system(size: 16, weight: .medium, design: .default))
-                                    .foregroundColor(ThemeColors.textPrimary)
-                                    .onChange(of: name) { _, _ in validationMessage = nil }
-                                    .tint(ThemeColors.accent)
-                            }
-                            .padding(16)
-                            .background(ThemeColors.cardBackground)
-                            .border(ThemeColors.cardBorder, width: 1)
-                            .cornerRadius(14)
-                            .padding(.horizontal, 20)
-                            
-                            // MARK: - Type & Frequency Grid
-                            VStack(spacing: 12) {
-                                // Type Card
-                                VStack(alignment: .leading, spacing: 12) {
-                                    HStack(spacing: 6) {
-                                        Circle().fill(ThemeColors.accent).frame(width: 6, height: 6)
-                                        Text("Category Type")
-                                            .font(.system(size: 13, weight: .semibold, design: .default))
-                                            .foregroundColor(ThemeColors.textSecondary)
-                                            .textCase(.uppercase)
-                                            .tracking(0.5)
-                                    }
-                                    
-                                    HStack(spacing: 8) {
-                                        ForEach(ExpenseType.allCases) { t in
-                                            Button(action: { type = t }) {
-                                                Text(t.displayTitle)
-                                                    .font(.system(size: 13, weight: .semibold, design: .default))
-                                                    .frame(maxWidth: .infinity)
-                                                    .padding(10)
-                                                    .background(
-                                                        type == t ?
-                                                        ThemeGradients.accentGradient :
-                                                        LinearGradient(
-                                                            gradient: Gradient(colors: [
-                                                                ThemeColors.buttonBackground,
-                                                                ThemeColors.buttonBackground.opacity(0.7)
-                                                            ]),
-                                                            startPoint: .topLeading,
-                                                            endPoint: .bottomTrailing
-                                                        )
-                                                    )
-                                                    .foregroundColor(type == t ? .white : ThemeColors.textPrimary)
-                                                    .cornerRadius(14)
-                                                    .overlay(
-                                                        RoundedRectangle(cornerRadius: 14)
-                                                            .stroke(
-                                                                type == t ?
-                                                                ThemeColors.accentPurple :
-                                                                ThemeColors.cardBorder,
-                                                                lineWidth: 1
-                                                            )
-                                                    )
-                                            }
-                                        }
-                                    }
-                                }
-                                .padding(16)
-                                .background(ThemeColors.cardBackground)
-                                .border(ThemeColors.cardBorder, width: 1)
-                                .cornerRadius(14)
-                                
-                                // Frequency Card
-                                VStack(alignment: .leading, spacing: 12) {
-                                    HStack(spacing: 6) {
-                                        Circle().fill(ThemeColors.accent).frame(width: 6, height: 6)
-                                        Text("Frequency")
-                                            .font(.system(size: 13, weight: .semibold, design: .default))
-                                            .foregroundColor(ThemeColors.textSecondary)
-                                            .textCase(.uppercase)
-                                            .tracking(0.5)
-                                    }
-                                    
-                                    if actionType == .add {
-                                        Picker("Frequency", selection: $frequency) {
-                                            ForEach(ExpenseFrequency.allCases) { freq in
-                                                Text(freq.displayTitle).tag(freq)
-                                            }
-                                        }
-                                        .pickerStyle(.segmented)
-                                        .tint(ThemeColors.accent)
-                                    } else {
-                                        HStack {
-                                            Text(frequency.displayTitle)
-                                                .font(.system(size: 16, weight: .medium, design: .default))
-                                                .foregroundColor(ThemeColors.textPrimary)
-                                            Spacer()
-                                            Text("(Fixed)")
-                                                .font(.caption)
-                                                .foregroundColor(ThemeColors.textSecondary)
-                                        }
-                                    }
-                                }
-                                .padding(16)
-                                .background(ThemeColors.cardBackground)
-                                .border(ThemeColors.cardBorder, width: 1)
-                                .cornerRadius(14)
-                            }
-                            .padding(.horizontal, 20)
-                            
-                            // MARK: - Schedule Section
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack(spacing: 6) {
-                                    Circle().fill(ThemeColors.accent).frame(width: 6, height: 6)
-                                    Text("Schedule")
-                                        .font(.system(size: 13, weight: .semibold, design: .default))
-                                        .foregroundColor(ThemeColors.textSecondary)
-                                        .textCase(.uppercase)
-                                        .tracking(0.5)
-                                }
-                                
-                                VStack(spacing: 12) {
-                                    switch frequency {
-                                    case .oneTime:
-                                        HStack(spacing: 12) {
-                                            VStack(alignment: .leading, spacing: 8) {
-                                                Text("Month")
-                                                    .font(.caption)
-                                                    .foregroundColor(ThemeColors.textSecondary)
-                                                Picker("Month", selection: $month) {
-                                                    ForEach(1...12, id: \.self) {
-                                                        Text(monthName($0)).tag($0)
-                                                    }
-                                                }
-                                                .tint(ThemeColors.accent)
-                                            }
-                                            
-                                            VStack(alignment: .leading, spacing: 8) {
-                                                Text("Year")
-                                                    .font(.caption)
-                                                    .foregroundColor(ThemeColors.textSecondary)
-                                                Picker("Year", selection: $year) {
-                                                    ForEach(yearRange, id: \.self) {
-                                                        Text(String($0)).tag($0)
-                                                    }
-                                                }
-                                                .tint(ThemeColors.accent)
-                                            }
-                                        }
-                                        
-                                    case .monthly:
-                                        VStack(spacing: 12) {
-                                            Text("Start Date")
-                                                .font(.caption2)
-                                                .foregroundColor(ThemeColors.textSecondary)
-                                            
-                                            HStack(spacing: 12) {
-                                                VStack(alignment: .leading, spacing: 8) {
-                                                    Text("Month")
-                                                        .font(.caption)
-                                                        .foregroundColor(ThemeColors.textSecondary)
-                                                    Picker("Start Month", selection: $startMonth) {
-                                                        ForEach(1...12, id: \.self) {
-                                                            Text(monthName($0)).tag($0)
-                                                        }
-                                                    }
-                                                    .tint(ThemeColors.accent)
-                                                }
-                                                
-                                                VStack(alignment: .leading, spacing: 8) {
-                                                    Text("Year")
-                                                        .font(.caption)
-                                                        .foregroundColor(ThemeColors.textSecondary)
-                                                    Picker("Start Year", selection: $startYear) {
-                                                        ForEach(yearRange, id: \.self) {
-                                                            Text(String($0)).tag($0)
-                                                        }
-                                                    }
-                                                    .tint(ThemeColors.accent)
-                                                }
-                                            }
-                                            
-                                            Divider()
-                                                .background(ThemeColors.cardBackground)
-                                            
-                                            Text("End Date")
-                                                .font(.caption2)
-                                                .foregroundColor(ThemeColors.textSecondary)
-                                            
-                                            HStack(spacing: 12) {
-                                                VStack(alignment: .leading, spacing: 8) {
-                                                    Text("Month")
-                                                        .font(.caption)
-                                                        .foregroundColor(ThemeColors.textSecondary)
-                                                    Picker("End Month", selection: $endMonth) {
-                                                        ForEach(1...12, id: \.self) {
-                                                            Text(monthName($0)).tag($0)
-                                                        }
-                                                    }
-                                                    .tint(ThemeColors.accent)
-                                                }
-                                                
-                                                VStack(alignment: .leading, spacing: 8) {
-                                                    Text("Year")
-                                                        .font(.caption)
-                                                        .foregroundColor(ThemeColors.textSecondary)
-                                                    Picker("End Year", selection: $endYear) {
-                                                        ForEach(yearRange, id: \.self) {
-                                                            Text(String($0)).tag($0)
-                                                        }
-                                                    }
-                                                    .tint(ThemeColors.accent)
-                                                }
-                                            }
-                                        }
-                                        
-                                    case .yearly:
-                                        VStack(spacing: 12) {
-                                            Text("Month of Occurrence")
-                                                .font(.caption2)
-                                                .foregroundColor(ThemeColors.textSecondary)
-                                            
-                                            VStack(alignment: .leading, spacing: 8) {
-                                                Text("Month")
-                                                    .font(.caption)
-                                                    .foregroundColor(ThemeColors.textSecondary)
-                                                Picker("Month", selection: $month) {
-                                                    ForEach(1...12, id: \.self) {
-                                                        Text(monthName($0)).tag($0)
-                                                    }
-                                                }
-                                                .tint(ThemeColors.accent)
-                                            }
-                                            
-                                            Divider()
-                                                .background(ThemeColors.cardBackground)
-                                            
-                                            Text("Duration")
-                                                .font(.caption2)
-                                                .foregroundColor(ThemeColors.textSecondary)
-                                            
-                                            HStack(spacing: 12) {
-                                                VStack(alignment: .leading, spacing: 8) {
-                                                    Text("From Year")
-                                                        .font(.caption)
-                                                        .foregroundColor(ThemeColors.textSecondary)
-                                                    Picker("Start Year", selection: $startYear) {
-                                                        ForEach(yearRange, id: \.self) {
-                                                            Text(String($0)).tag($0)
-                                                        }
-                                                    }
-                                                    .tint(ThemeColors.accent)
-                                                }
-                                                
-                                                VStack(alignment: .leading, spacing: 8) {
-                                                    Text("To Year")
-                                                        .font(.caption)
-                                                        .foregroundColor(ThemeColors.textSecondary)
-                                                    Picker("End Year", selection: $endYear) {
-                                                        ForEach(yearRange, id: \.self) {
-                                                            Text(String($0)).tag($0)
-                                                        }
-                                                    }
-                                                    .tint(ThemeColors.accent)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                .padding(16)
-                                .background(ThemeColors.cardBackground)
-                                .border(ThemeColors.cardBorder, width: 1)
-                                .cornerRadius(14)
-                            }
-                            .padding(.horizontal, 20)
-                            
-                            // MARK: - Due Day Card
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack(spacing: 6) {
-                                    Circle().fill(ThemeColors.accent).frame(width: 6, height: 6)
-                                    Text("Due / ECS Day")
-                                        .font(.system(size: 13, weight: .semibold, design: .default))
-                                        .foregroundColor(ThemeColors.textSecondary)
-                                        .textCase(.uppercase)
-                                        .tracking(0.5)
-                                }
-                                
-                                Picker("Day", selection: $dueDay) {
-                                    Text("None").tag(Int?.none)
-                                    ForEach(1...31, id: \.self) {
-                                        Text("\($0)").tag(Optional($0))
-                                    }
-                                }
-                                .tint(ThemeColors.accent)
-                            }
-                            .padding(16)
-                            .background(ThemeColors.cardBackground)
-                            .border(ThemeColors.cardBorder, width: 1)
-                            .cornerRadius(14)
-                            .padding(.horizontal, 20)
-                            
-                            // MARK: - Notes Card
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack(spacing: 6) {
-                                    Circle().fill(ThemeColors.accent).frame(width: 6, height: 6)
-                                    Text("Notes")
-                                        .font(.system(size: 13, weight: .semibold, design: .default))
-                                        .foregroundColor(ThemeColors.textSecondary)
-                                        .textCase(.uppercase)
-                                        .tracking(0.5)
-                                }
-                                
-                                TextEditor(text: $note)
-                                    .font(.system(size: 14, design: .default))
-                                    .foregroundColor(ThemeColors.textPrimary)
-                                    .scrollContentBackground(.hidden)
-                                    .background(ThemeColors.background)
-                                    .frame(minHeight: 80)
-                                    .cornerRadius(8)
-                                    .border(ThemeColors.cardBorder, width: 1)
-                            }
-                            .padding(16)
-                            .background(ThemeColors.cardBackground)
-                            .border(ThemeColors.cardBorder, width: 1)
-                            .cornerRadius(14)
-                            .padding(.horizontal, 20)
-                            
-                            // MARK: - Payment Status Card (Edit only)
-                            if actionType == .update, expense.isPaid {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text("Payment Status")
-                                                .font(.system(size: 13, weight: .semibold, design: .default))
-                                                .foregroundColor(ThemeColors.textSecondary)
-                                                .textCase(.uppercase)
-                                                .tracking(0.5)
-                                            
-                                            HStack(spacing: 8) {
-                                                Image(systemName: "checkmark.circle.fill")
-                                                    .foregroundColor(Color(red: 0.2, green: 0.8, blue: 0.4))
-                                                Text("Paid")
-                                                    .font(.system(size: 16, weight: .semibold, design: .default))
-                                                    .foregroundColor(ThemeColors.textPrimary)
-                                            }
-                                        }
-                                        Spacer()
-                                    }
-                                    
-                                    Button(action: { showPaymentDetailsSheet = true }) {
-                                        HStack {
-                                            Text("View / Edit Payment Details")
-                                                .font(.system(size: 14, weight: .medium, design: .default))
-                                            Spacer()
-                                            Image(systemName: "chevron.right")
-                                        }
-                                        .foregroundColor(ThemeColors.accent)
-                                        .padding(12)
-                                        .background(ThemeColors.accent.opacity(0.08))
-                                        .cornerRadius(14)
-                                    }
-                                }
-                                .padding(16)
-                                .background(ThemeColors.cardBackground)
-                                .border(ThemeColors.cardBorder, width: 1)
-                                .cornerRadius(14)
-                                .padding(.horizontal, 20)
-                            }
-                            
-                            // MARK: - Delete Button (Edit only)
-                            if actionType == .update {
-                                Button(role: .destructive, action: deleteExpense) {
-                                    HStack {
-                                        Image(systemName: "trash.fill")
-                                        Text("Delete Expense")
-                                    }
-                                    .font(.system(size: 15, weight: .semibold, design: .default))
-                                    .frame(maxWidth: .infinity)
-                                    .padding(12)
-                                    .background(ThemeColors.negative.opacity(0.08))
-                                    .foregroundColor(ThemeColors.negative)
-                                    .cornerRadius(14)
-                                    .border(ThemeColors.negative.opacity(0.2), width: 1)
-                                }
-                                .padding(.horizontal, 20)
-                                .padding(.top, 8)
-                            }
-                            
-                            // Bottom spacing
-                            Spacer()
-                                .frame(height: 20)
+                        if actionType == .update {
+                            deleteButton
                         }
                     }
-                    
-// MARK: - Action Buttons
-ZStack {
-    // Floating container with material + shadow
-    HStack {
-        Spacer()
-        VStack {
-            HStack(spacing: 12) {
-                // Cancel as lightweight text
-                Button("Cancel") { dismiss() }
-                    .font(.system(size: 15, weight: .semibold, design: .default))
-                    .foregroundColor(ThemeColors.textSecondary)
-
-                Spacer(minLength: 12)
-
-                // Primary CTA full-width within the container
-                Button(action: {
-                    if validate() {
-                        impact.impactOccurred()
-                        saveUpdateExpense()
-                    }
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "checkmark")
-                        Text(actionType == .add ? "Add Expense" : "Save Changes")
-                    }
-                    .font(.system(size: 16, weight: .semibold, design: .default))
-                    .foregroundColor(.white)
-                    .frame(minHeight: 52)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        Group {
-                            if isValid {
-                                ThemeGradients.positiveGradient
-                            } else {
-                                ThemeGradients.positiveGradient.opacity(0.5)
-                            }
-                        }
-                    )
-                    .cornerRadius(14)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                    .padding(.bottom, 24)
                 }
-                .disabled(!isValid)
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 14)
-            .background(
-                ZStack {
-                    VisualEffectBlur()
-                    ThemeColors.accentPurple.opacity(0.06)
-                }
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .shadow(color: Color.black.opacity(0.18), radius: 16, x: 0, y: 10)
-        }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 18)
-        Spacer()
-    }
-}
-.ignoresSafeArea(edges: .bottom)
-                }
+                .navigationBarHidden(true)
+                .safeAreaInset(edge: .bottom) { actionBar }
                 .onAppear {
                     impact.prepare()
                     if actionType == .add {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                            isAmountFocused = true
-                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { isAmountFocused = true }
                     }
                 }
                 .sheet(isPresented: $showPaymentDetailsSheet) {
-                    PaymentDetailsSheet(
-                        expense: expense,
-                        context: context
-                    )
+                    PaymentDetailsSheet(expense: expense, context: context)
                 }
-                .confirmationDialog(
-                    "Apply changes to",
-                    isPresented: $showApplyScopeDialog,
-                    titleVisibility: .visible
-                )
-                {
+                .confirmationDialog("Apply changes to", isPresented: $showApplyScopeDialog, titleVisibility: .visible) {
                     Button("This expense only") {
                         expense.frequency = .oneTime
-                        
                         expense.month = month
                         expense.year = year
-                        
+                        expense.day = nil
                         expense.startMonth = nil
                         expense.startYear = nil
-                        
                         expense.endMonth = nil
                         expense.endYear = nil
-                        
-                        dataService.expenseUnified(
-                            expense: expense,
-                            actionType: actionType
-                        )
+                        dataService.expenseUnified(expense: expense, actionType: actionType)
                         dismiss()
                     }
 
                     Button("All recurring expenses") {
-                        dataService.expenseUnified(
-                            expense: expense,
-                            actionType: actionType
-                        )
+                        dataService.expenseUnified(expense: expense, actionType: actionType)
                         dismiss()
                     }
 
-                    Button("Cancel", role: .cancel) {
-                        actionType = .update
-                    }
+                    Button("Cancel", role: .cancel) { actionType = .update }
                 } message: {
                     Text("This expense is recurring.")
                 }
-                
-                .animation(.easeInOut, value: validationMessage)
             }
         }
+    }
+
+    private var title: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(actionType == .add ? "New Expense" : "Edit Expense")
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .foregroundColor(ThemeColors.textPrimary)
+                Text("Amount, details and schedule")
+                    .font(.subheadline)
+                    .foregroundColor(ThemeColors.textSecondary)
+            }
+            Spacer()
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(ThemeColors.textSecondary)
+                    .frame(width: 32, height: 32)
+                    .background(ThemeColors.cardElevated)
+                    .clipShape(Circle())
+            }
+        }
+    }
+
+    private var amountCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Amount")
+                .font(.headline)
+                .foregroundColor(ThemeColors.textPrimary)
+
+            HStack(spacing: 6) {
+                Text("₹")
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .foregroundColor(ThemeColors.textSecondary)
+                TextField("0", text: $amount)
+                    .keyboardType(.decimalPad)
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .foregroundColor(ThemeColors.textPrimary)
+                    .focused($isAmountFocused)
+                    .onChange(of: amount) { _, _ in
+                        validationMessage = nil
+                        let filtered = amount.filter { $0.isNumber || $0 == "." }
+                        let parts = filtered.split(separator: ".", omittingEmptySubsequences: false)
+                        amount = parts.count > 2 ? String(parts[0]) + "." + String(parts[1]) : filtered
+                    }
+            }
+
+            Text("Enter exact amount")
+                .font(.caption)
+                .foregroundColor(ThemeColors.textSecondary)
+        }
+        .padding(16)
+        .modernCard()
+    }
+
+    private var detailsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Details")
+                .font(.headline)
+                .foregroundColor(ThemeColors.textPrimary)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Expense Name")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(ThemeColors.textSecondary)
+                TextField("Rent, Electricity, Internet...", text: $name)
+                    .textInputAutocapitalization(.words)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 11)
+                    .background(ThemeColors.cardElevated)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .onChange(of: name) { _, _ in validationMessage = nil }
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Category Type")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(ThemeColors.textSecondary)
+                Picker("Type", selection: $type) {
+                    ForEach(ExpenseType.allCases) { t in
+                        Text(t.displayTitle).tag(t)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Frequency")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(ThemeColors.textSecondary)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(ExpenseFrequency.allCases) { item in
+                            Button {
+                                frequency = item
+                            } label: {
+                                Text(item.displayTitle)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundColor(frequency == item ? .white : ThemeColors.textPrimary)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        frequency == item
+                                        ? AnyShapeStyle(ThemeGradients.accentGradient)
+                                        : AnyShapeStyle(ThemeColors.cardElevated)
+                                    )
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Category")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(ThemeColors.textSecondary)
+
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(), spacing: 14, alignment: .leading),
+                        GridItem(.flexible(), spacing: 14, alignment: .leading)
+                    ],
+                    alignment: .leading,
+                    spacing: 12
+                ) {
+                    ForEach(ExpenseCategory.allCases) { item in
+                        Button { category = item } label: {
+                            HStack {
+                                HStack(spacing: 6) {
+                                    Image(systemName: item.systemImage)
+                                        .font(.system(size: 13, weight: .bold))
+                                    Text(item.displayTitle)
+                                        .font(.caption.weight(.semibold))
+                                        .lineLimit(1)
+                                }
+                                Spacer(minLength: 0)
+                            }
+                            .foregroundColor(category == item ? .white : ThemeColors.textSecondary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(
+                                category == item
+                                ? AnyShapeStyle(LinearGradient(colors: [ThemeColors.accent, ThemeColors.accent.opacity(0.82)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                : AnyShapeStyle(ThemeStore.shared.isDarkMode ? Color.white.opacity(0.08) : Color(red: 0.95, green: 0.96, blue: 0.98))
+                            )
+                            .overlay(
+                                Capsule()
+                                    .stroke(category == item ? Color.clear : ThemeColors.cardBorder.opacity(0.45), lineWidth: 0.9)
+                            )
+                            .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            if frequency != .daily {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Due Day")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(ThemeColors.textSecondary)
+                    Menu {
+                        Button("None") { dueDay = nil }
+                        ForEach(1...31, id: \.self) { day in
+                            Button("Day \(day)") { dueDay = day }
+                        }
+                    } label: {
+                        compactMenuFieldLabel(value: dueDay == nil ? "None" : "Day \(dueDay!)")
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .modernCard()
+    }
+
+    private var scheduleCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Schedule")
+                .font(.headline)
+                .foregroundColor(ThemeColors.textPrimary)
+
+            switch frequency {
+            case .daily:
+                DatePicker("Date", selection: $dailyDate, displayedComponents: .date)
+                    .datePickerStyle(.graphical)
+
+            case .oneTime:
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Month")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(ThemeColors.textSecondary)
+                        monthMenu(selected: $month)
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Year")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(ThemeColors.textSecondary)
+                        yearMenu(selected: $year)
+                    }
+                }
+
+            case .monthly:
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Start")
+                        .font(.caption.weight(.bold))
+                        .foregroundColor(ThemeColors.textSecondary)
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Month")
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(ThemeColors.textSecondary)
+                            monthMenu(selected: $startMonth)
+                        }
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Year")
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(ThemeColors.textSecondary)
+                            yearMenu(selected: $startYear)
+                        }
+                    }
+
+                    Text("End")
+                        .font(.caption.weight(.bold))
+                        .foregroundColor(ThemeColors.textSecondary)
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Month")
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(ThemeColors.textSecondary)
+                            monthMenu(selected: $endMonth)
+                        }
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Year")
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(ThemeColors.textSecondary)
+                            yearMenu(selected: $endYear)
+                        }
+                    }
+                }
+
+            case .yearly:
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Month")
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(ThemeColors.textSecondary)
+                            monthMenu(selected: $month)
+                        }
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("From")
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(ThemeColors.textSecondary)
+                            yearMenu(selected: $startYear)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("To")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(ThemeColors.textSecondary)
+                        yearMenu(selected: $endYear)
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .modernCard()
+    }
+
+    private var noteCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Notes")
+                .font(.headline)
+                .foregroundColor(ThemeColors.textPrimary)
+            TextEditor(text: $note)
+                .frame(minHeight: 80)
+                .padding(8)
+                .background(ThemeColors.cardElevated)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .padding(16)
+        .modernCard()
+    }
+
+    private var paidCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Payment")
+                .font(.headline)
+                .foregroundColor(ThemeColors.textPrimary)
+            Button { showPaymentDetailsSheet = true } label: {
+                HStack {
+                    Label("View or edit payment details", systemImage: "creditcard")
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(ThemeColors.accent)
+                .padding(12)
+                .background(ThemeColors.accent.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(16)
+        .modernCard()
+    }
+
+    private var deleteButton: some View {
+        Button(role: .destructive, action: deleteExpense) {
+            HStack {
+                Image(systemName: "trash")
+                Text("Delete Expense")
+            }
+            .font(.subheadline.weight(.bold))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+        }
+        .background(ThemeColors.negative.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private var actionBar: some View {
+        HStack(spacing: 12) {
+            Button("Cancel") { dismiss() }
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(ThemeColors.textSecondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 13)
+                .background(ThemeColors.cardElevated)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+            Button {
+                if validate() {
+                    impact.impactOccurred()
+                    saveUpdateExpense()
+                }
+            } label: {
+                Text(actionType == .add ? "Add Expense" : "Save Changes")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 13)
+                    .background(ThemeGradients.accentGradient)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .disabled(!isValid)
+            .opacity(isValid ? 1 : 0.55)
+        }
+        .padding(12)
+        .background(.ultraThinMaterial)
+    }
+
+    private func monthMenu(selected: Binding<Int>) -> some View {
+        Menu {
+            ForEach(1...12, id: \.self) { value in
+                Button(monthName(value)) { selected.wrappedValue = value }
+            }
+        } label: {
+            compactMenuFieldLabel(value: monthName(selected.wrappedValue))
+        }
+    }
+
+    private func yearMenu(selected: Binding<Int>) -> some View {
+        Menu {
+            ForEach(yearRange, id: \.self) { value in
+                Button(String(value)) { selected.wrappedValue = value }
+            }
+        } label: {
+            compactMenuFieldLabel(value: String(selected.wrappedValue))
+        }
+    }
+
+    private func compactMenuFieldLabel(value: String) -> some View {
+        HStack(spacing: 8) {
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(ThemeColors.textPrimary)
+                .lineLimit(1)
+            Spacer()
+            Image(systemName: "chevron.down")
+                .font(.caption.weight(.bold))
+                .foregroundColor(ThemeColors.textSecondary)
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 9)
+        .background(ThemeColors.cardElevated)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
 private extension AddEditExpenseView {
-
-    // MARK: - Validation
     var isValid: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty &&
         Double(amount) != nil
@@ -766,7 +537,6 @@ private extension AddEditExpenseView {
     private func validate() -> Bool {
         validationMessage = nil
 
-        // Common
         if name.trimmingCharacters(in: .whitespaces).isEmpty {
             validationMessage = "Expense name is required."
             return false
@@ -777,22 +547,19 @@ private extension AddEditExpenseView {
             return false
         }
 
-        // Frequency-specific
         switch frequency {
-
+        case .daily:
+            break
         case .oneTime:
             if month < 1 || month > 12 {
                 validationMessage = "Select a valid month."
                 return false
             }
-
         case .monthly:
-            if (startYear > endYear) ||
-               (startYear == endYear && startMonth > endMonth) {
+            if (startYear > endYear) || (startYear == endYear && startMonth > endMonth) {
                 validationMessage = "Start date must be before end date."
                 return false
             }
-
         case .yearly:
             if startYear > endYear {
                 validationMessage = "Start year must be before end year."
@@ -800,110 +567,93 @@ private extension AddEditExpenseView {
             }
         }
 
-        if let day = dueDay, day < 1 || day > 31 {
+        if frequency != .daily, let day = dueDay, day < 1 || day > 31 {
             validationMessage = "Enter a valid due day."
             return false
         }
 
-        
         return true
     }
 
-    
-    // MARK: - Save Routing
     func saveUpdateExpense() {
         let finalAmount = Double(amount) ?? 0
 
         expense.name = name
         expense.amount = finalAmount
         expense.type = type
+        expense.category = category
         expense.frequency = frequency
         expense.month = month
         expense.year = year
-        
+
         switch frequency {
-        case .oneTime:
-            expense.month = month
-            expense.year = year
-            
+        case .daily:
+            let comps = Calendar.current.dateComponents([.day, .month, .year], from: dailyDate)
+            expense.day = comps.day
+            expense.month = comps.month ?? month
+            expense.year = comps.year ?? year
             expense.startMonth = nil
             expense.startYear = nil
-            
             expense.endMonth = nil
             expense.endYear = nil
+
+        case .oneTime:
+            expense.day = nil
+            expense.month = month
+            expense.year = year
+            expense.startMonth = nil
+            expense.startYear = nil
+            expense.endMonth = nil
+            expense.endYear = nil
+
         case .monthly:
-            
+            expense.day = nil
             expense.startMonth = startMonth
             expense.startYear = startYear
-            
             expense.endMonth = endMonth
             expense.endYear = endYear
-            
-            // 🔒 instance date locked for monthly
             expense.month = startMonth
             expense.year = startYear
-            
+
         case .yearly:
+            expense.day = nil
             expense.startMonth = nil
             expense.startYear = startYear
-            
             expense.endMonth = nil
             expense.endYear = endYear
-            
-            // 🔒 instance date locked for monthly
             expense.month = month
             expense.year = startYear
         }
-              
-        expense.dueDay = dueDay
+
+        expense.dueDay = frequency == .daily ? nil : dueDay
         expense.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // 🔥 EDIT CASE: ask confirmation if future months are involved
-        if actionType == .update && expense.frequency != .oneTime {
+
+        if actionType == .update && (expense.frequency == .monthly || expense.frequency == .yearly) {
             showApplyScopeDialog = true
         } else {
-            dataService.expenseUnified(
-                expense: expense,
-                actionType: actionType
-            )
+            dataService.expenseUnified(expense: expense, actionType: actionType)
             dismiss()
-        }
-        
-    }
-    
-    // MARK: - Delete
-    func deleteExpense() {
-        impact.impactOccurred()
-        self.actionType = .delete
-        // 🔥 EDIT CASE: ask confirmation if future months are involved
-        if expense.frequency == .oneTime {
-            dataService.expenseUnified(
-                expense: expense,
-                actionType: .delete
-            )
-            dismiss()
-        } else {
-            showApplyScopeDialog = true
         }
     }
 
-    // MARK: - Helpers
+    func deleteExpense() {
+        impact.impactOccurred()
+        actionType = .delete
+
+        if expense.frequency == .monthly || expense.frequency == .yearly {
+            showApplyScopeDialog = true
+        } else {
+            dataService.expenseUnified(expense: expense, actionType: .delete)
+            dismiss()
+        }
+    }
+
     var yearRange: [Int] {
         let currentYear = Calendar.current.component(.year, from: Date())
         return Array((currentYear - 5)...(currentYear + 10))
     }
 
     func monthName(_ month: Int) -> String {
-        DateFormatter().monthSymbols[month - 1]
+        DateFormatter().shortMonthSymbols[month - 1]
     }
 }
-
-struct VisualEffectBlur: UIViewRepresentable {
-    var style: UIBlurEffect.Style = .systemMaterial
-
-    func makeUIView(context: Context) -> UIVisualEffectView {
-        UIVisualEffectView(effect: UIBlurEffect(style: style))
-    }
-    func updateUIView(_ uiView: UIVisualEffectView, context: Context) {}
-}
-

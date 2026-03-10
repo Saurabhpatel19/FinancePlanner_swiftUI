@@ -1,95 +1,136 @@
-//
-//  RootTabView.swift
-//  FinancePlanner
-//
-//  Created by Saurabh on 29/12/25.
-//
-
-
 import SwiftUI
 
-struct RootTabView: View {
+enum AppTab: String, CaseIterable, Identifiable {
+    case home
+    case daily
+    case bills
+    case stats
+    case settings
 
-    @Environment(\.modelContext) private var context
-    @State private var showAddExpense = false
-    @State private var selectedTab: Int = 0
+    var id: Self { self }
 
-    var body: some View {
-        ZStack(alignment: .bottom) {
-            TabView(selection: $selectedTab) {
-                HomeView()
-                    .tag(0)
-                    .tabItem {
-                        Label("Home", systemImage: "house")
-                    }
-
-                YearlyExpenseView()
-                    .tag(1)
-                    .tabItem {
-                        Label("Yearly", systemImage: "calendar")
-                    }
-
-                
-                // Center plus tab (visual only)
-                Color.clear
-                    .tag(2)
-                    .tabItem {
-                        ZStack {
-                            // raise the plus slightly above the bar
-                            Circle()
-                                .fill(ThemeGradients.accentGradient)
-                                .frame(width: 54, height: 54)
-                                .shadow(color: Color.black.opacity(0.18), radius: 10, x: 0, y: 6)
-                                .offset(y: -10)
-                            Image(systemName: "plus")
-                                .font(.system(size: 22, weight: .bold))
-                                .foregroundColor(.white)
-                                .offset(y: -10)
-                        }
-                        .frame(height: 44) // ensures tab item space
-                        .accessibilityLabel("Add Expense")
-                    }
-
-                AllExpensesView()
-                    .tag(3)
-                    .tabItem {
-                        Label("All", systemImage: "list.bullet.rectangle")
-                    }
-
-                // Settings placeholder
-                Color.clear
-                    .tag(4)
-                    .tabItem {
-                        Label("Settings", systemImage: "gear")
-                    }
-            }
-            .onChange(of: selectedTab) { old, new in
-                if new == 2 { // plus tab tapped
-                    // revert to previous tab (default to Home if unknown)
-                    selectedTab = (old == 2 ? 0 : old)
-                    showAddExpense = true
-                }
-            }
+    var icon: String {
+        switch self {
+        case .home: return "house.fill"
+        case .daily: return "calendar"
+        case .bills: return "list.clipboard.fill"
+        case .stats: return "chart.bar.fill"
+        case .settings: return "gearshape.fill"
         }
-        .sheet(isPresented: $showAddExpense) {
-            let now = Date()
-            let cal = Calendar.current
-            let m = cal.component(.month, from: now)
-            let y = cal.component(.year, from: now)
+    }
 
-            AddEditExpenseView(
-                expense: ExpenseModel(
-                    name: "",
-                    amount: 0,
-                    type: .fixed,
-                    frequency: .monthly,
-                    month: m,
-                    year: y
-                ),
-                actionType: .add,
-                context: context
-            )
+    var label: String {
+        switch self {
+        case .home: return "Home"
+        case .daily: return "Daily"
+        case .bills: return "Bills"
+        case .stats: return "Stats"
+        case .settings: return "Settings"
         }
     }
 }
 
+struct RootTabView: View {
+    @State private var activeTab: AppTab = .home
+    @State private var showAddModal = false
+
+    var body: some View {
+        ZStack {
+            TabView(selection: $activeTab) {
+                HomeView(onGoToBills: { activeTab = .bills }, onGoToDaily: { activeTab = .daily })
+                    .tag(AppTab.home)
+                    .tabItem {
+                        Image(systemName: AppTab.home.icon)
+                        Text(AppTab.home.label)
+                    }
+
+                DailyExpenseView()
+                    .tag(AppTab.daily)
+                    .tabItem {
+                        Image(systemName: AppTab.daily.icon)
+                        Text(AppTab.daily.label)
+                    }
+
+                BillsView()
+                    .tag(AppTab.bills)
+                    .tabItem {
+                        Image(systemName: AppTab.bills.icon)
+                        Text(AppTab.bills.label)
+                    }
+
+                StatsView()
+                    .tag(AppTab.stats)
+                    .tabItem {
+                        Image(systemName: AppTab.stats.icon)
+                        Text(AppTab.stats.label)
+                    }
+
+                SettingsView()
+                    .tag(AppTab.settings)
+                    .tabItem {
+                        Image(systemName: AppTab.settings.icon)
+                        Text(AppTab.settings.label)
+                    }
+            }
+            .tint(JColor.primary)
+            .ignoresSafeArea(.container, edges: [.top, .bottom])
+
+            if showAddModal {
+                Color.black.opacity(0.45)
+                    .ignoresSafeArea()
+                    .onTapGesture { showAddModal = false }
+
+                VStack {
+                    Spacer()
+                    AddExpenseModalView(
+                        defaultTab: defaultAddTab,
+                        onClose: { showAddModal = false }
+                    )
+                }
+                .ignoresSafeArea(edges: .bottom)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    fab
+                }
+                .padding(.trailing, 20)
+                .padding(.bottom, 76)
+            }
+            .allowsHitTesting(!showAddModal)
+        }
+        .animation(.easeInOut(duration: 0.2), value: showAddModal)
+    }
+
+    private var fab: some View {
+        Button {
+            showAddModal = true
+        } label: {
+            Circle()
+                .fill(LinearGradient(colors: [JColor.primary, Color(hex: "#9B59B6")], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .frame(width: 58, height: 58)
+                .overlay(
+                    Circle()
+                        .stroke(.white, lineWidth: 3)
+                )
+                .overlay(
+                    Image(systemName: "plus")
+                        .font(.system(size: 22, weight: .black))
+                        .foregroundColor(.white)
+                )
+                .shadow(color: JColor.primary.opacity(0.55), radius: 14, x: 0, y: 8)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var defaultAddTab: AddExpenseModalView.AddMode {
+        switch activeTab {
+        case .daily: return .daily
+        case .bills: return .monthly
+        case .stats, .home, .settings: return .daily
+        }
+    }
+}

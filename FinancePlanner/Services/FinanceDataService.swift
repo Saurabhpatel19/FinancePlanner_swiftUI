@@ -100,6 +100,10 @@ private extension FinanceDataService {
 
         switch expense.frequency {
 
+        case .daily:
+            startMonth = expense.month
+            startYear = expense.year
+
         case .oneTime:
             startMonth = expense.month
             startYear = expense.year
@@ -123,6 +127,10 @@ private extension FinanceDataService {
         let endYear: Int
 
         switch expense.frequency {
+
+        case .daily:
+            endMonth = startMonth
+            endYear = startYear
 
         case .oneTime:
             endMonth = startMonth
@@ -161,10 +169,11 @@ private extension FinanceDataService {
                 seriesId: seriesId,
                 month: month,
                 year: year,
+                day: expense.frequency == .daily ? expense.day : nil,
                 startMonth: expense.frequency == .monthly ? startMonth : nil,
-                startYear: expense.frequency != .oneTime ? startYear : nil,
+                startYear: (expense.frequency == .monthly || expense.frequency == .yearly) ? startYear : nil,
                 endMonth: expense.frequency == .monthly ? endMonth : nil,
-                endYear: expense.frequency != .oneTime ? endYear : nil
+                endYear: (expense.frequency == .monthly || expense.frequency == .yearly) ? endYear : nil
             )
 
             // restore paid state if exists
@@ -181,6 +190,9 @@ private extension FinanceDataService {
 
             // MARK: - Step
             switch expense.frequency {
+
+            case .daily:
+                return
 
             case .oneTime:
                 return   // exactly one record
@@ -227,6 +239,7 @@ private extension FinanceDataService {
                 exp.name = expense.name
                 exp.amount = expense.amount
                 exp.type = expense.type
+                exp.category = expense.category
                 
                 exp.dueDay = expense.dueDay
                 exp.note = expense.note
@@ -263,17 +276,17 @@ private extension FinanceDataService {
             guard exp.seriesId == expense.seriesId else { continue }
 
             // 🔑 oneTime = instance-level update
-            if expense.frequency == .oneTime {
-                if exp.frequency != .oneTime {
+            if expense.frequency == .oneTime || expense.frequency == .daily {
+                if exp.frequency != expense.frequency {
                     continue
                 }
-                if exp.month != expense.month || exp.year != expense.year {
+                if exp.month != expense.month || exp.year != expense.year || exp.day != expense.day {
                     continue
                 }
             }
 
             // 🔑 monthly/yearly = series-level update
-            if expense.frequency != .oneTime,
+            if expense.frequency != .oneTime && expense.frequency != .daily,
                exp.frequency != expense.frequency {
                 continue
             }
@@ -282,6 +295,8 @@ private extension FinanceDataService {
             exp.name = expense.name
             exp.amount = expense.amount
             exp.type = expense.type
+            exp.category = expense.category
+            exp.day = expense.day
             
             exp.dueDay = expense.dueDay
             exp.note = expense.note
@@ -299,9 +314,9 @@ private extension FinanceDataService {
             guard exp.seriesId == expense.seriesId else { continue }
 
             // 🔑 oneTime = instance-level delete
-            if expense.frequency == .oneTime {
-                if exp.frequency != .oneTime { continue }
-                if exp.month != expense.month || exp.year != expense.year { continue }
+            if expense.frequency == .oneTime || expense.frequency == .daily {
+                if exp.frequency != expense.frequency { continue }
+                if exp.month != expense.month || exp.year != expense.year || exp.day != expense.day { continue }
                 context.delete(exp)
                 continue
             }
@@ -319,6 +334,7 @@ private extension FinanceDataService {
         seriesId: UUID,
         month: Int,
         year: Int,
+        day: Int? = nil,
         startMonth: Int? = nil,
         startYear: Int? = nil,
         endMonth: Int? = nil,
@@ -330,7 +346,9 @@ private extension FinanceDataService {
             name: expense.name,
             amount: expense.amount,
             type: expense.type,
+            category: expense.category,
             frequency: expense.frequency,
+            day: day,
             month: month,
             year: year,
             startMonth: startMonth,

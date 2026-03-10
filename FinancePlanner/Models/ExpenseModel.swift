@@ -18,9 +18,11 @@
      var name: String
      var amount: Double
      var type: ExpenseType
+     var category: ExpenseCategory?
      var frequency: ExpenseFrequency
 
      // ✅ NEW (SOURCE OF TRUTH)
+     var day: Int?         // 1...31 (for daily expenses)
      var month: Int        // 1...12
      var year: Int         // 2025, 2026, etc
 
@@ -60,7 +62,9 @@
          name: String,
          amount: Double,
          type: ExpenseType,
+         category: ExpenseCategory? = .other,
          frequency: ExpenseFrequency,
+         day: Int? = nil,
          month: Int,
          year: Int,
          startMonth: Int? = nil,
@@ -79,7 +83,9 @@
          self.name = name
          self.amount = amount
          self.type = type
+         self.category = category
          self.frequency = frequency
+         self.day = day
          self.month = month
          self.year = year
          self.startMonth = startMonth

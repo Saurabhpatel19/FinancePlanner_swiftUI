@@ -1,100 +1,73 @@
-//
-//  ExpenseCard.swift
-//  FinancePlanner
-//
-//  Created by Saurabh on 30/12/25.
-//
-
 import SwiftUI
 
 struct ExpenseCard: View {
-
     let expense: ExpenseModel
     var selectedYear: Int?
     var isCurrentMonth: Bool = false
     let onTogglePaid: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Main row
-            HStack(spacing: 12) {
-
-                if isCurrentMonth || selectedYear != nil {
-                    Button(action: onTogglePaid) {
-                        Image(systemName: expense.isPaid
-                              ? "checkmark.circle.fill"
-                              : "circle")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundColor(
-                                expense.isPaid ? ThemeColors.positive : ThemeColors.textSecondary
-                            )
-                    }
-                    .buttonStyle(.plain)
+        HStack(spacing: 12) {
+            if isCurrentMonth || selectedYear != nil {
+                Button(action: onTogglePaid) {
+                    Image(systemName: expense.isPaid ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundColor(expense.isPaid ? ThemeColors.positive : ThemeColors.textTertiary)
                 }
+                .buttonStyle(.plain)
+            }
 
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 8) {
-                        Text(expense.name)
-                            .font(.system(size: 15, weight: .semibold, design: .default))
-                            .foregroundColor(ThemeColors.textPrimary)
-                        
-                        if let dueDay = expense.dueDay {
-                            let monthName = getMonthName(month: expense.month)
-                            Text("Due: \(dueDay) \(monthName)")
-                                .font(.caption2)
-                                .foregroundColor(ThemeColors.textSecondary)
-                        }
-                    }
+            VStack(alignment: .leading, spacing: 6) {
+                Text(expense.name)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundColor(ThemeColors.textPrimary)
 
-                    HStack(spacing: 8) {
-                        // Frequency badge
-                        Text(expense.frequency.displayTitle)
-                            .font(.caption2)
-                            .foregroundColor(ThemeColors.accent)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(ThemeColors.accent.opacity(0.1))
-                            .cornerRadius(4)
-                        
-                        // Type badge
-                        Text(expense.type.displayTitle)
-                            .font(.caption2)
-                            .foregroundColor(ThemeColors.accentPurple)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(ThemeColors.accentPurple.opacity(0.1))
-                            .cornerRadius(4)
-                        
-                        Spacer()
-                    }
-                }
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text("₹\(Int(expense.amount))")
-                        .font(.system(size: 16, weight: .bold, design: .default))
-                        .foregroundColor(ThemeColors.textPrimary)
-                    
-                    if expense.isPaid {
-                        Text("Paid")
-                            .font(.caption2)
-                            .foregroundColor(ThemeColors.positive)
-                    }
+                HStack(spacing: 6) {
+                    badge(expense.frequency.displayTitle, tint: ThemeColors.accent)
+                    metaText
                 }
             }
-            .padding(14)
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 3) {
+                Text("₹\(Int(expense.amount))")
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundColor(ThemeColors.textPrimary)
+                if expense.isPaid {
+                    Text("Paid")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(ThemeColors.positive)
+                }
+            }
         }
-        .background(ThemeColors.cardBackground)
-        .border(ThemeColors.cardBorder, width: 1)
-        .cornerRadius(12)
+        .padding(14)
+        .modernCard(radius: 14)
     }
-    
-    func getMonthName(month: Int) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM"
-        let date = Calendar.current.date(from: DateComponents(year: 2024, month: month, day: 1))!
-        return formatter.string(from: date)
+
+    private func badge(_ title: String, tint: Color) -> some View {
+        Text(title)
+            .font(.caption2.weight(.semibold))
+            .foregroundColor(tint)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(tint.opacity(0.12))
+            .clipShape(Capsule())
+    }
+
+    private var metaText: some View {
+        let category = expense.category ?? .other
+        return Text(metaLine(for: category))
+            .font(.caption2)
+            .foregroundColor(ThemeColors.textSecondary)
+            .lineLimit(1)
+    }
+
+    private func metaLine(for category: ExpenseCategory) -> String {
+        var parts: [String] = [expense.type.displayTitle, category.displayTitle]
+        if let dueDay = expense.dueDay {
+            parts.append("Due \(dueDay)")
+        }
+        return parts.joined(separator: " • ")
     }
 }
-

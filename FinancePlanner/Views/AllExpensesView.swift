@@ -1,17 +1,7 @@
-//
-//  AllExpensesView.swift
-//  FinancePlanner
-//
-//  Created by Saurabh on 29/12/25.
-//
-
-
 import SwiftUI
 import SwiftData
 
 struct AllExpensesView: View {
-
-    // MARK: - Data
     @Query(sort: [
         SortDescriptor(\ExpenseModel.year, order: .forward),
         SortDescriptor(\ExpenseModel.month, order: .forward)
@@ -19,240 +9,154 @@ struct AllExpensesView: View {
     private var expenses: [ExpenseModel]
 
     @State private var expandedYears: Set<Int> = []
-   
-    // MARK: - Body
+
     var body: some View {
         ZStack {
-            ThemeColors.background
-                .ignoresSafeArea()
-            
+            AppBackground()
+
             NavigationStack {
-                VStack(spacing: 0) {
-                    // Header
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("All Expenses")
-                            .font(.system(size: 32, weight: .bold, design: .default))
+                ScrollView {
+                    VStack(spacing: 14) {
+                        header
+
+                        if yearlySeriesSections.isEmpty {
+                            emptyState
+                        } else {
+                            ForEach(yearlySeriesSections) { section in
+                                yearSectionCard(section)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                    .padding(.bottom, 28)
+                }
+                .navigationBarHidden(true)
+                .onAppear {
+                    let currentYear = Calendar.current.component(.year, from: Date())
+                    expandedYears = Set(yearlySeriesSections.map(\.year).filter { $0 <= currentYear })
+                }
+            }
+        }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("All Expenses")
+                .font(.system(size: 30, weight: .bold, design: .rounded))
+                .foregroundColor(ThemeColors.textPrimary)
+            Text("Complete expense history")
+                .font(.subheadline)
+                .foregroundColor(ThemeColors.textSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "tray")
+                .font(.system(size: 30, weight: .semibold))
+                .foregroundColor(ThemeColors.accent)
+            Text("No expenses yet")
+                .font(.headline)
+                .foregroundColor(ThemeColors.textPrimary)
+            Text("Start adding expenses to see your timeline")
+                .font(.subheadline)
+                .foregroundColor(ThemeColors.textSecondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+        .modernCard()
+    }
+
+    private func yearSectionCard(_ section: YearExpenseSection) -> some View {
+        let total = section.items.reduce(0) { $0 + $1.displayTotal }
+        let expanded = expandedYears.contains(section.year)
+
+        return VStack(spacing: 0) {
+            Button {
+                withAnimation(.spring(duration: 0.24)) {
+                    if expanded { expandedYears.remove(section.year) } else { expandedYears.insert(section.year) }
+                }
+            } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(String(section.year))
+                            .font(.title3.weight(.bold))
                             .foregroundColor(ThemeColors.textPrimary)
-                        
-                        Text("Complete expense history")
+                        Text("\(section.items.count) series • ₹\(Int(total))")
                             .font(.caption)
                             .foregroundColor(ThemeColors.textSecondary)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(20)
-                    
-                    // Content
-                    ScrollView {
-                        VStack(spacing: 16) {
-                            if yearlySeriesSections.isEmpty {
-                                emptyState
-                            } else {
-                                ForEach(yearlySeriesSections) { section in
-                                    yearSectionCard(section)
-                                }
-                            }
-                        }
-                        .padding(20)
-                    }
-                }
-                .navigationBarTitleDisplayMode(.inline)
-                .onAppear {
-                    let currentYear = Calendar.current.component(.year, from: Date())
-                    expandedYears = Set(
-                        yearlySeriesSections
-                            .map(\.year)
-                            .filter { $0 <= currentYear }
-                    )
-                }
-            }
-        }
-    }
-    
-    var emptyState: some View {
-        VStack(spacing: 16) {
-            ZStack {
-                Circle()
-                    .fill(ThemeColors.accent.opacity(0.1))
-                    .frame(width: 80, height: 80)
-                
-                Image(systemName: "tray")
-                    .font(.system(size: 32, weight: .semibold))
-                    .foregroundColor(ThemeColors.accent)
-            }
-            
-            VStack(spacing: 4) {
-                Text("No expenses yet")
-                    .font(.system(size: 16, weight: .semibold, design: .default))
-                    .foregroundColor(ThemeColors.textPrimary)
-                
-                Text("Start adding expenses to see them here")
-                    .font(.caption)
-                    .foregroundColor(ThemeColors.textSecondary)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 60)
-    }
-    
-    
-    func yearSectionCard(_ section: YearExpenseSection) -> some View {
-        VStack(spacing: 0) {
-            // Header Button
-            Button(action: {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    if expandedYears.contains(section.year) {
-                        expandedYears.remove(section.year)
-                    } else {
-                        expandedYears.insert(section.year)
-                    }
-                }
-            }) {
-                let total = section.items.reduce(0) { $0 + $1.displayTotal }
-                let isExpanded = expandedYears.contains(section.year)
-                
-                HStack(spacing: 16) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 8) {
-                            Text(String(section.year))
-                                .font(.system(size: 18, weight: .bold, design: .default))
-                                .foregroundColor(ThemeColors.textPrimary)
-                            
-                            Text("\(section.items.count) items")
-                                .font(.caption)
-                                .foregroundColor(ThemeColors.textSecondary)
-                        }
-                        
-                        HStack(spacing: 12) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Total")
-                                    .font(.caption2)
-                                    .foregroundColor(ThemeColors.textSecondary)
-                                
-                                Text("₹\(Int(total))")
-                                    .font(.system(size: 16, weight: .semibold, design: .default))
-                                    .foregroundColor(ThemeColors.positive)
-                            }
-                            
-                            Spacer()
-                        }
-                    }
-                    
                     Spacer()
-                    
-                    VStack(spacing: 8) {
-                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(ThemeColors.accent)
-                            .frame(width: 24, height: 24)
-                    }
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(ThemeColors.accent)
                 }
-                .padding(16)
+                .padding(14)
             }
             .buttonStyle(.plain)
-            .background(
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        ThemeColors.cardBackground,
-                        ThemeColors.cardBackground.opacity(0.8)
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            
-            // Expanded Content
-            if expandedYears.contains(section.year) {
-                Divider()
-                    .background(ThemeColors.cardBorder)
-                
-                VStack(spacing: 12) {
+
+            if expanded {
+                Divider().overlay(ThemeColors.cardBorder)
+                VStack(spacing: 10) {
                     ForEach(section.items) { summary in
                         seriesExpenseItem(summary)
                     }
                 }
-                .padding(16)
+                .padding(12)
             }
         }
-        .background(ThemeColors.cardBackground)
-        .border(ThemeColors.cardBorder, width: 1)
-        .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
+        .modernCard(radius: 16)
     }
-    
-    func seriesExpenseItem(_ summary: SeriesExpenseSummary) -> some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(summary.name)
-                        .font(.system(size: 14, weight: .semibold, design: .default))
-                        .foregroundColor(ThemeColors.textPrimary)
-                    
-                    HStack(spacing: 8) {
-                        // Frequency badge
-                        Text(summary.frequency.displayTitle)
-                            .font(.caption2)
-                            .foregroundColor(ThemeColors.accent)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(ThemeColors.accent.opacity(0.1))
-                            .cornerRadius(4)
-                        
-                        if let monthlyAmount = summary.monthlyAmount {
-                            Text("₹\(Int(monthlyAmount))/mo")
-                                .font(.caption2)
-                                .foregroundColor(ThemeColors.textSecondary)
-                        }
-                        
-                        Spacer()
+
+    private func seriesExpenseItem(_ summary: SeriesExpenseSummary) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(summary.name)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(ThemeColors.textPrimary)
+
+                HStack(spacing: 8) {
+                    Text(summary.frequency.displayTitle)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(ThemeColors.accent)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(ThemeColors.accent.opacity(0.12))
+                        .clipShape(Capsule())
+                    if let monthlyAmount = summary.monthlyAmount {
+                        Text("₹\(Int(monthlyAmount))/mo")
+                            .font(.caption)
+                            .foregroundColor(ThemeColors.textSecondary)
                     }
                 }
-                
-                Spacer()
-                
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text("₹\(Int(summary.displayTotal))")
-                        .font(.system(size: 15, weight: .bold, design: .default))
-                        .foregroundColor(ThemeColors.textPrimary)
-                }
             }
-            .padding(12)
-            .background(ThemeColors.background.opacity(0.5))
-            .cornerRadius(8)
+
+            Spacer()
+
+            Text("₹\(Int(summary.displayTotal))")
+                .font(.subheadline.weight(.bold))
+                .foregroundColor(ThemeColors.textPrimary)
         }
-    }
-            
-    private var expensesByYear: [(year: Int, items: [ExpenseModel])] {
-        let grouped = Dictionary(grouping: expenses) { $0.year }
-
-        return grouped
-            .map { (year: $0.key, items: $0.value.sorted {
-                ($0.month, $0.name) < ($1.month, $1.name)
-            }) }
-            .sorted { $0.year < $1.year }
-    }
-
-    private func yearHeader(year: Int, items: [SeriesExpenseSummary]) -> some View {
-        EmptyView()
+        .padding(12)
+        .background(ThemeColors.cardElevated)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private var yearlySeriesSections: [YearExpenseSection] {
-
         let groupedByYear = Dictionary(grouping: expenses) { $0.year }
 
         return groupedByYear
             .map { year, yearlyExpenses in
-
                 let groupedBySeries = Dictionary(grouping: yearlyExpenses) { $0.seriesId }
 
                 let summaries: [SeriesExpenseSummary] = groupedBySeries.compactMap { _, seriesExpenses in
-                    guard let representativeOLF = seriesExpenses.first else { return nil }
-                    
-                    let representative = seriesExpenses.first!
+                    guard let representative = seriesExpenses.first else { return nil }
                     let frequency = representative.frequency
 
                     let displayTotal: Double
                     let monthlyAmount: Double?
-
                     if frequency == .monthly {
                         displayTotal = seriesExpenses.reduce(0) { $0 + $1.amount }
                         monthlyAmount = representative.amount
@@ -260,6 +164,7 @@ struct AllExpensesView: View {
                         displayTotal = representative.amount
                         monthlyAmount = nil
                     }
+
                     return SeriesExpenseSummary(
                         id: representative.seriesId,
                         name: representative.name,
@@ -274,13 +179,8 @@ struct AllExpensesView: View {
                 }
                 .sorted { $0.name < $1.name }
 
-                return YearExpenseSection(
-                    year: year,
-                    items: summaries
-                )
+                return YearExpenseSection(year: year, items: summaries)
             }
             .sorted { $0.year < $1.year }
     }
-
-
 }

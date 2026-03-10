@@ -1,15 +1,6 @@
-//
-//  PurpleGradientCard.swift
-//  FinancePlanner
-//
-//  Created by Saurabh on 02/01/26.
-//
-
-
 import SwiftUI
 
 struct PurpleGradientCard<Content: View>: View {
-
     let content: Content
 
     init(@ViewBuilder content: () -> Content) {
@@ -20,23 +11,9 @@ struct PurpleGradientCard<Content: View>: View {
         content
             .padding(16)
             .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.purple.opacity(0.9),
-                                Color.blue.opacity(0.9)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(ThemeGradients.accentGradient)
             )
-            .shadow(
-                color: Color.black.opacity(0.3),
-                radius: 8,
-                y: 4
-            )
+            .shadow(color: ThemeColors.accent.opacity(0.25), radius: 10, x: 0, y: 6)
     }
 }
-
